@@ -1980,3 +1980,55 @@ i[data-live="true"] {
     font-size: 9px;
   }
 }
+.fc-card-toggle {
+  display: none;
+}
+@media (max-width: 600px) and (max-height: 700px) {
+  .fc-compact-card {
+    max-height: 180px;
+    padding: 12px 15px;
+    overflow: hidden;
+  }
+  .fc-card-toggle {
+    display: block;
+    position: absolute;
+    right: 15px;
+    bottom: 12px;
+    z-index: 2;
+    border: 0;
+    background: var(--fc-panel);
+    color: var(--fc-text);
+    font-size: 10px;
+    padding: 3px 0 3px 8px;
+  }
+  .fc-compact-card:not(.fc-expanded) .fc-health-tabs,
+  .fc-compact-card:not(.fc-expanded) .fc-reading-grid,
+  .fc-compact-card:not(.fc-expanded) .fc-health-foot,
+  .fc-compact-card:not(.fc-expanded) .fc-capacity-history,
+  .fc-compact-card:not(.fc-expanded) .fc-posting-note,
+  .fc-compact-card:not(.fc-expanded) .fc-scope,
+  .fc-compact-card:not(.fc-expanded) .fc-card-bottom,
+  .fc-compact-card:not(.fc-expanded) .fc-description,
+  .fc-compact-card:not(.fc-expanded) .fc-small,
+  .fc-compact-card:not(.fc-expanded) .fc-product-metric p {
+    display: none;
+  }
+  .fc-compact-card:not(.fc-expanded) .fc-block-reading {
+    padding: 10px 0 19px;
+  }
+  .fc-compact-card:not(.fc-expanded) .fc-block-reading > strong {
+    font-size: 28px;
+  }
+  .fc-compact-card.fc-expanded {
+    max-height: calc(100dvh - 220px);
+    padding-bottom: 32px;
+    overflow: auto;
+  }
+  .fc-compact-card.fc-expanded .fc-card-toggle {
+    position: sticky;
+    top: 0;
+    bottom: auto;
+    float: right;
+    margin-top: -3px;
+  }
+}

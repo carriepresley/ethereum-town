@@ -1809,7 +1809,10 @@ export function mountFinancialCity(container, places, onSelect = () => {}) {
         isNetwork = stations.has(id);
       if (id === "ethereum" || id === "staking") {
         desiredTarget.set(HALL.x, width < 600 ? 6.25 : 5.4, HALL.z + 0.8);
-        desiredZoom = width < 600 ? 1.08 : 1.94;
+        desiredZoom =
+          width < 600
+            ? 1.08 * Math.min(1, Math.max(0.65, (height - 370) / 315))
+            : 1.94;
         desiredYaw = 0.24;
         desiredPitch = 0.54;
       } else if (isNetwork) {

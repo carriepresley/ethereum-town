@@ -39,6 +39,7 @@ function FinancialCity() {
     health = useHealth();
   const [selected, setSelected] = useState<string | null>("ethereum"),
     [layer, setLayer] = useState<"all" | "connected" | "context">("all");
+  const [compactExpanded, setCompactExpanded] = useState(false);
   const [night, setNight] = useState(true),
     [paused, setPaused] = useState(false),
     [speed, setSpeed] = useState(1),
@@ -317,10 +318,19 @@ function FinancialCity() {
         </button>
       </div>
       <aside
-        className="fc-card fc-compact-card"
+        className={
+          "fc-card fc-compact-card" + (compactExpanded ? " fc-expanded" : "")
+        }
         hidden={!selected}
         style={{ "--place-color": place?.color ?? "#a1a2ff" } as CSSProperties}
       >
+        <button
+          className="fc-card-toggle"
+          aria-expanded={compactExpanded}
+          onClick={() => setCompactExpanded((v) => !v)}
+        >
+          {compactExpanded ? "Less detail ▾" : "Show details ▴"}
+        </button>
         {place ? (
           <>
             <div className="fc-card-eyebrow">
