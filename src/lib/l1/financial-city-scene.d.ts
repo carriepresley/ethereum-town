@@ -25,6 +25,10 @@ export type FinancialCityController = {
   setSpeed(speed: number): void;
   setLayers(layer: "all" | "connected" | "context"): void;
   setObservedEvents(events: FinancialCityEvent[]): void;
+  setHealth(health: {
+    status: "normal" | "attention" | "unknown";
+    blockHash: string | null;
+  }): void;
   setNetworkActivity(records: FinancialCityActivity[]): void;
   resetView(): void;
   getCanvas(): HTMLCanvasElement;

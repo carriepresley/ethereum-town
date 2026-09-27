@@ -18,6 +18,13 @@ import { useLiveFeeds, shortTime, age } from "@/lib/l1/live-hooks";
 import { useFinanceMetrics } from "@/lib/l1/use-finance-metrics";
 import { isFinanceMetricFresh } from "@/lib/l1/finance-metrics";
 import { isTelemetryFresh } from "@/lib/l1/telemetry";
+import { useHealth } from "@/lib/l1/use-health";
+import {
+  EthereumHealthCard,
+  NetworkHealthCard,
+  HealthDataDetails,
+  healthBeaconState,
+} from "@/lib/l1/health-panels";
 import { exact, short } from "@/lib/l1/data";
 import type { FinancialCityController } from "@/lib/l1/financial-city-scene";
 export const Route = createFileRoute("/")({
@@ -28,8 +35,9 @@ export const Route = createFileRoute("/")({
 });
 function FinancialCity() {
   const feeds = useLiveFeeds(),
-    finance = useFinanceMetrics();
-  const [selected, setSelected] = useState<string | null>(null),
+    finance = useFinanceMetrics(),
+    health = useHealth();
+  const [selected, setSelected] = useState<string | null>("ethereum"),
     [layer, setLayer] = useState<"all" | "connected" | "context">("all");
   const [night, setNight] = useState(true),
     [paused, setPaused] = useState(false),
@@ -41,7 +49,23 @@ function FinancialCity() {
     dialog = useRef<HTMLDialogElement>(null);
   const place = CITY_PLACES.find((p) => p.id === selected),
     isStaking = selected === "staking",
-    isEthereum = selected === "ethereum";
+    isEthereum = selected === "ethereum",
+    selectedNetwork = NETWORKS.find((n) => n.id === selected);
+  const healthState = healthBeaconState(
+    health.snapshot,
+    health.failed,
+    feeds.now,
+  );
+  const healthSignal = useMemo(
+    () => ({
+      status: healthState,
+      blockHash:
+        healthState === "unknown"
+          ? null
+          : (health.snapshot?.latest?.hash ?? null),
+    }),
+    [healthState, health.snapshot?.latest?.hash],
+  );
   const freshCount = feeds.telemetry.chains.filter((row) =>
     isTelemetryFresh(row, feeds.now),
   ).length;
@@ -90,6 +114,7 @@ function FinancialCity() {
     speed,
     observedEvents,
     activity,
+    healthSignal,
   });
   state.current = {
     selected,
@@ -99,6 +124,7 @@ function FinancialCity() {
     speed,
     observedEvents,
     activity,
+    healthSignal,
   };
   useEffect(() => {
     let disposed = false;
@@ -111,10 +137,15 @@ function FinancialCity() {
           host.current,
           CITY_PLACES,
           (id) => {
-            if (id) setLayer("all");
-            setSelected(
-              id && NETWORKS.some((n) => n.id === id) ? "ethereum" : id,
-            );
+            if (id)
+              setLayer(
+                NETWORKS.some((n) => n.id === id) || id === "staking"
+                  ? "all"
+                  : CITY_PLACES.find((p) => p.id === id)?.status === "context"
+                    ? "context"
+                    : "connected",
+              );
+            setSelected(id);
           },
         );
         city.current = controller;
@@ -125,6 +156,7 @@ function FinancialCity() {
         controller.setLayers(s.layer);
         controller.select(s.selected);
         controller.setNetworkActivity(s.activity);
+        controller.setHealth(s.healthSignal);
         controller.setObservedEvents(s.observedEvents);
         setReady(true);
       })
@@ -140,28 +172,45 @@ function FinancialCity() {
       city.current = null;
     };
   }, []);
-  useEffect(() => city.current?.select(selected), [selected]);
+  useEffect(() => {
+    city.current?.setLayers(layer);
+    city.current?.select(selected);
+  }, [layer, selected]);
+  useEffect(() => city.current?.setHealth(healthSignal), [healthSignal]);
   useEffect(() => city.current?.setNight(night), [night]);
   useEffect(() => city.current?.setPaused(paused), [paused]);
   useEffect(() => city.current?.setSpeed(speed), [speed]);
-  useEffect(() => city.current?.setLayers(layer), [layer]);
   useEffect(() => city.current?.setNetworkActivity(activity), [activity]);
   useEffect(
     () => city.current?.setObservedEvents(observedEvents),
     [observedEvents],
   );
-  const visiblePlaces = layer === "context" ? CONTEXT_PLACES : CONNECTED_PLACES;
+  const visiblePlaces =
+    layer === "context"
+      ? CONTEXT_PLACES
+      : layer === "connected"
+        ? CONNECTED_PLACES
+        : NETWORKS;
   function choose(id: string | null) {
-    const next = CITY_PLACES.find((p) => p.id === id);
-    if (next?.status === "context" && layer === "connected") setLayer("all");
-    if (next && next.status !== "context" && layer === "context")
-      setLayer("all");
+    if (id)
+      setLayer(
+        NETWORKS.some((n) => n.id === id) || id === "staking"
+          ? "all"
+          : CITY_PLACES.find((p) => p.id === id)?.status === "context"
+            ? "context"
+            : "connected",
+      );
     setSelected(id);
   }
   function changeLayer(value: "all" | "connected" | "context") {
     setLayer(value);
-    setSelected(null);
-    city.current?.resetView();
+    setSelected(
+      value === "all"
+        ? "ethereum"
+        : value === "connected"
+          ? "usdc"
+          : "sector-bank-deposits",
+    );
   }
   function step(amount: number) {
     const at = visiblePlaces.findIndex((p) => p.id === selected);
@@ -176,7 +225,7 @@ function FinancialCity() {
   }
   const network = NETWORKS.find((n) => n.id === place?.networkId),
     networkRow = feeds.telemetry.chains.find(
-      (n) => n.id === (place?.networkId ?? "ethereum"),
+      (n) => n.id === (selectedNetwork?.id ?? place?.networkId ?? "ethereum"),
     );
   const metric = finance.snapshot?.metrics.find((m) => m.id === place?.id);
   const metricCurrent =
@@ -186,10 +235,6 @@ function FinancialCity() {
     feeds.now - Date.parse(feeds.staking.capturedAt) < 1200000;
   const stakingChecked =
     feeds.staking.capturedAt.replace("T", " ").slice(0, 19) + " UTC";
-  const liveProducts = CONNECTED_PLACES.filter(
-      (p) => p.status === "live",
-    ).length,
-    pilots = CONNECTED_PLACES.filter((p) => p.status === "pilot").length;
   const currentEvent = feeds.bridges?.events[0];
   return (
     <main className="financial-city" data-light={night ? "night" : "day"}>
@@ -205,7 +250,7 @@ function FinancialCity() {
           <span aria-hidden="true">◇</span>
           <div>
             <strong>Ethereum Town</strong>
-            <small>A growing financial district.</small>
+            <small>A living view of the Ethereum ecosystem.</small>
           </div>
         </a>
         <div className="fc-header-right">
@@ -229,9 +274,9 @@ function FinancialCity() {
       <nav className="fc-view-switch" aria-label="City view">
         {(
           [
-            ["all", "The whole city"],
-            ["connected", "On Ethereum"],
-            ["context", "Wider finance"],
+            ["all", "Network"],
+            ["connected", "Finance"],
+            ["context", "Wider world"],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -243,7 +288,7 @@ function FinancialCity() {
           </button>
         ))}
       </nav>
-      <nav className="fc-place-rail" aria-label="Explore financial products">
+      <nav className="fc-place-rail" aria-label="Explore the town">
         {visiblePlaces.map((p) => (
           <button
             key={p.id}
@@ -254,32 +299,26 @@ function FinancialCity() {
             {p.name}
           </button>
         ))}
-        <button aria-pressed={isEthereum} onClick={() => choose("ethereum")}>
-          ◇ Ethereum
-        </button>
         <button aria-pressed={isStaking} onClick={() => choose("staking")}>
           ETH staking
         </button>
       </nav>
       <div className="fc-traverse">
-        <button
-          onClick={() => step(-1)}
-          aria-label="Previous financial building"
-        >
+        <button onClick={() => step(-1)} aria-label="Previous place">
           ← <span>Previous</span>
         </button>
         <span>
-          {place
-            ? visiblePlaces.findIndex((p) => p.id === place.id) + 1
+          {selected && visiblePlaces.some((p) => p.id === selected)
+            ? `${visiblePlaces.findIndex((p) => p.id === selected) + 1} / ${visiblePlaces.length}`
             : "Explore"}
-          {place ? " / " + visiblePlaces.length : ""}
         </span>
-        <button onClick={() => step(1)} aria-label="Next financial building">
+        <button onClick={() => step(1)} aria-label="Next place">
           <span>Next</span> →
         </button>
       </div>
       <aside
-        className="fc-card"
+        className="fc-card fc-compact-card"
+        hidden={!selected}
         style={{ "--place-color": place?.color ?? "#a1a2ff" } as CSSProperties}
       >
         {place ? (
@@ -455,7 +494,8 @@ function FinancialCity() {
             <p className="fc-small">
               Reported by ethereum.org, checked every 15 minutes. Its
               measurement time is not published. Lights are symbolic;
-              liquid-staking tokens are not counted again.
+              liquid-staking tokens are not counted again. Validator
+              participation and operator concentration are not measured.
             </p>
             <a
               className="fc-source-link"
@@ -467,174 +507,22 @@ function FinancialCity() {
             </a>
           </>
         ) : isEthereum ? (
-          <>
-            <div className="fc-card-eyebrow">
-              <span>The shared foundation</span>
-              <button
-                className="fc-card-close"
-                onClick={() => choose(null)}
-                aria-label="Back to city overview"
-              >
-                ×
-              </button>
-            </div>
-            <h1>Ethereum</h1>
-            <p className="fc-description">
-              The connected district uses Ethereum directly or through L2s. L2s
-              execute their own transactions and publish data or state updates
-              to Ethereum.
-            </p>
-            <div className="fc-product-metric">
-              <span>Latest observed Ethereum block</span>
-              <strong>
-                {networkRow?.blockNumber ? exact(networkRow.blockNumber) : "—"}
-              </strong>
-              <p>
-                {networkRow?.transactionCount ?? "—"} transactions ·{" "}
-                {shortTime(networkRow?.blockTimestamp)}
-                <br />
-                {isTelemetryFresh(networkRow, feeds.now)
-                  ? "Current"
-                  : "Checking / stale"}{" "}
-                · finality not verified
-              </p>
-            </div>
-            <div className="fc-network-chips">
-              {NETWORKS.filter((n) => n.kind === "l2").map((n) => (
-                <span key={n.id}>
-                  <i
-                    data-live={isTelemetryFresh(
-                      feeds.telemetry.chains.find((r) => r.id === n.id),
-                      feeds.now,
-                    )}
-                  />
-                  {n.name}
-                </span>
-              ))}
-            </div>
-            <button
-              className="fc-text-button"
-              onClick={() => dialog.current?.showModal()}
-            >
-              Inspect observed L2 connections ↗
-            </button>
-          </>
-        ) : (
-          <>
-            <div className="fc-card-eyebrow">
-              <span>
-                {layer === "context"
-                  ? "The wider financial world"
-                  : "A city of real connections"}
-              </span>
-              <span className="fc-mini-diamond">◇</span>
-            </div>
-            <h1>
-              {layer === "context"
-                ? "Finance is a much bigger city."
-                : "Explore finance on Ethereum."}
-            </h1>
-            <p className="fc-description">
-              {layer === "context"
-                ? "Banks, markets, insurers and asset owners operate across many systems. Their whole businesses are not represented by the products connected here."
-                : "Step into the shops already operating on Ethereum and its L2s. Around them, a much larger financial world carries on."}
-            </p>
-            {layer !== "context" && (
-              <div className="fc-overview-metrics">
-                {(["usdc", "usdt"] as const).map((id) => {
-                  const value = finance.snapshot?.metrics.find(
-                    (m) => m.id === id,
-                  );
-                  return (
-                    <button key={id} onClick={() => choose(id)}>
-                      <span>
-                        <i
-                          data-live={
-                            isFinanceMetricFresh(value, feeds.now) &&
-                            !finance.failed
-                          }
-                        />
-                        {id.toUpperCase()}
-                      </span>
-                      <strong>
-                        {value?.value === null || value?.value === undefined
-                          ? "—"
-                          : short(value.value)}
-                      </strong>
-                      <small>
-                        Ethereum tokens ·{" "}
-                        {isFinanceMetricFresh(value, feeds.now) &&
-                        !finance.failed
-                          ? "Current"
-                          : value?.value !== null && value?.value !== undefined
-                            ? "Last known"
-                            : finance.snapshot
-                              ? "Unavailable"
-                              : "Checking"}
-                      </small>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-            <div className="fc-intro-counts">
-              <button onClick={() => changeLayer("connected")}>
-                <strong>{liveProducts}</strong>
-                <span>live products mapped</span>
-              </button>
-              <button
-                onClick={() =>
-                  choose(
-                    CONNECTED_PLACES.find((p) => p.status === "pilot")?.id ??
-                      null,
-                  )
-                }
-              >
-                <strong>{pilots}</strong>
-                <span>documented pilot</span>
-              </button>
-              <button onClick={() => changeLayer("context")}>
-                <strong>{CONTEXT_PLACES.length}</strong>
-                <span>wider finance sectors</span>
-              </button>
-            </div>
-            <div className="fc-intro-legend">
-              <span>
-                <i className="fc-key-live" />
-                Documented connection
-              </span>
-              <span>
-                <i className="fc-key-pilot" />
-                Pilot
-              </span>
-              <span>
-                <i className="fc-key-context" />
-                Wider finance context
-              </span>
-            </div>
-            <p className="fc-small">
-              Select a shop to see its product, network and evidence. This is a
-              selected map, not a measure of Ethereum’s share of global finance.
-            </p>
-          </>
-        )}
+          <EthereumHealthCard
+            snapshot={health.snapshot}
+            failed={health.failed}
+            now={feeds.now}
+            inspect={() => dialog.current?.showModal()}
+          />
+        ) : selectedNetwork ? (
+          <NetworkHealthCard
+            id={selectedNetwork.id}
+            row={networkRow}
+            bridges={feeds.bridges}
+            now={feeds.now}
+            choose={choose}
+          />
+        ) : null}
       </aside>
-      <div className="fc-story-label">
-        <span>
-          {layer === "connected"
-            ? "THE CONNECTED DISTRICT"
-            : layer === "context"
-              ? "THE WIDER FINANCIAL WORLD"
-              : "ONE FINANCIAL WORLD. MANY SYSTEMS."}
-        </span>
-        <p>
-          {layer === "connected"
-            ? "Real products. Traceable connections."
-            : layer === "context"
-              ? "More than any single network."
-              : "A growing district on Ethereum."}
-        </p>
-      </div>
       <div className="fc-live-strip">
         <i data-live={eventFresh} />
         {eventFresh && currentEvent ? (
@@ -692,27 +580,27 @@ function FinancialCity() {
             ↗ <span>City view</span>
           </button>
         </div>
-        <p>
-          Street life is illustrative. Light pulses show observed network
-          activity.
-        </p>
+        <p>People are decorative. Pulses mark observed network activity.</p>
         <button
           className="fc-refresh"
-          disabled={feeds.refreshing || finance.loading}
+          disabled={feeds.refreshing || finance.loading || health.loading}
           onClick={() => {
             feeds.refresh();
             finance.refresh();
+            health.refresh();
           }}
         >
           ↻{" "}
           <span>
-            {feeds.refreshing || finance.loading ? "Checking" : "Refresh data"}
+            {feeds.refreshing || finance.loading || health.loading
+              ? "Checking"
+              : "Refresh data"}
           </span>
         </button>
       </footer>
       {!ready && (
         <div className="fc-loading">
-          <span>◇</span>Opening the financial district…
+          <span>◇</span>Opening Ethereum Town…
         </div>
       )}
       {error && (
@@ -730,7 +618,7 @@ function FinancialCity() {
         <div className="fc-dialog-top">
           <div>
             <span>ETHEREUM TOWN</span>
-            <h2 id="city-data-title">A map you can read.</h2>
+            <h2 id="city-data-title">Inside the live town.</h2>
           </div>
           <button
             autoFocus
@@ -742,11 +630,16 @@ function FinancialCity() {
         </div>
         <div className="fc-dialog-body">
           <p className="fc-dialog-lead">
-            The illuminated shops are selected financial products with
-            documented Ethereum connections. The surrounding city represents the
-            larger financial system, whose activity spans offchain
-            infrastructure and many networks.
+            Ethereum Town separates network reliability, capacity and financial
+            adoption. The hall shows Ethereum readings; the neighborhoods show
+            L2 execution and selected Ethereum publications. Financial shops are
+            documented products, surrounded by a wider financial world.
           </p>
+          <HealthDataDetails
+            snapshot={health.snapshot}
+            failed={health.failed}
+            now={feeds.now}
+          />
           <div className="fc-guide-grid">
             <section>
               <h3>Read the streets</h3>

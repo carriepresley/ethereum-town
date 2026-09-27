@@ -1,15 +1,18 @@
-# Financial city design
+# Ethereum Town: a live miniature system
 
-Ethereum Town is a walkable city of financial products, not a race between network transaction counters. It is inspired by Ryan Sael's Token Town street-level shopfronts, warm windows, tiny road life, close cameras and compact information cards. Code and procedural assets are original.
+The default view is a close three-quarter view of Ethereum Hall. A warm, detailed miniature building holds the composition, with recognizable L2 hubs and connected routes around it. Wider finance remains distant context. The design follows the reference's compositional and rendering techniques with original geometry, signs and code; see docs/token-town-reference-audit.md.
 
-The connected quarter contains nine recognizable product storefronts, eight documented live products/protocols and one documented live pilot. The broader financial world surrounds this quarter through six inhabited sector buildings. They do not imply unconnected named institutions, migration commitments, or an Ethereum share of global finance. Their scale is architectural.
+## Read the town
 
-Ethereum's civic hall and symbolic staking foundation anchor the district. L2 transit routes sit behind the products as shared infrastructure. Static mint-colored roads show documented connections and amber identifies a pilot. Only observed network events emit moving light pulses; vehicles and pedestrians are plainly illustrative.
+- Ethereum Hall: observed latest and finalized execution heads, timestamp gap and recent canonical slot coverage. A verified new block hash can pulse the beacon.
+- Capacity tab: gas utilization against the actual block limit, a real 16-block utilization history, execution base fee and blob count. The 50% target marker is not a maximum or a health score.
+- L2 neighborhoods: clickable network hubs with their own observed block and selected Ethereum infrastructure event details. Routes reflect architecture; moving pulses only come from supplied observations. Block counts are not comparable TPS or unique people.
+- Finance: documented product storefronts. USDC and USDT show Ethereum contract token supplies; unmeasured products show source-backed scope rather than artificial activity.
+- Foundation: reported ETH stake with the source-check time and measurement limitations. No inferred participation or concentration.
+- Wider world: contextual sectors without size-based asset claims or promised migration arrows.
 
-The whole-city view establishes context. On Ethereum and Wider finance controls move the camera and update the navigation without deleting the other district. Shop selection gives a closer street view and a compact card explaining its product, selected network, source and scope. Circle and Tether expose their direct Ethereum contract supplies. Other products get documented status rather than fabricated activity metrics.
+## Visual priorities
 
-Dusk is the default: charcoal streets, warm connected shops, awnings, large upper windows, flowers, cafés, bicycles, crosswalks and lamps. Taller surrounding sector buildings have cooler light. Day mode remains available. Desktop uses a lower-left card and unobstructed central canvas. Mobile starts closer inside the district, provides a scrollable bottom card and supports pinch zoom.
+Use narrow perspective, rounded major geometry, warm interiors, contact shadows, restrained bloom and depth of field. Focus and material treatment organize the selected place. Keep one compact card, readable signs, and a small selection rail. Finance and network views remain directly accessible. Phone framing keeps the complete Ethereum symbol and facade between navigation and the card, with reduced postprocessing.
 
-A native About & data dialog provides mapping rules, product evidence, source timestamps, network observations, bridge coverage and staking limitations. It supports keyboard access, Escape dismissal and focus restoration. Animation pause/speed does not stop data updates. Reduced-motion preference pauses animation.
-
-Public Vercel hosting remains at https://ethereumtown.vercel.app with private GitHub source. No login, wallet or transaction flows.
+Missing data is gray and explicitly unavailable or last known. Supply, reliability and economic growth are separate. Ambient people and vehicles are decorative. Do not create a combined health score, fake customer counts, imagined queues of institutions, or synthetic history.

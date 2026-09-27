@@ -22,7 +22,7 @@ describe('public app security boundaries', () => {
     }
   })
   test('public feed handlers expose reads and do not accept a URL or query as input', async () => {
-    for (const file of ['telemetry','bridges','activity','staking','finance-metrics']) {
+    for (const file of ['telemetry','bridges','activity','staking','finance-metrics','health']) {
       const code = await source('src/lib/l1/' + file + '.functions.ts')
       expect(code).toMatch(/method:\s*['"]GET['"]/)
       expect(code).not.toMatch(/inputValidator|\.validator\(|\{\s*data\s*\}|request\.url|searchParams/)
@@ -58,7 +58,7 @@ builtTest('built server rejects hostile methods and paths without disclosure or 
   expect(manifestFile).toBeTruthy()
   const code = await source('.output/server/' + manifestFile)
   const manifest = [...code.matchAll(/"([a-f0-9]{64})":\s*\{\s*functionName: "([^"]+)_createServerFn_handler"/g)]
-  expect(manifest.map(m => m[2]).sort()).toEqual(['getActivity','getBridges','getStaking','getTelemetry','getFinanceMetrics'].sort())
+  expect(manifest.map(m => m[2]).sort()).toEqual(['getActivity','getBridges','getStaking','getTelemetry','getFinanceMetrics','getHealth'].sort())
   const id = manifest.find(m => m[2] === 'getTelemetry')?.[1]
   expect(id).toBeTruthy()
   const bundleUrl = new URL('../.output/server/_ssr/ssr.mjs', import.meta.url).href

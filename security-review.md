@@ -4,9 +4,9 @@ Reviewed 2026-09-27 UTC. Scope: the standalone public application, source and st
 
 ## Results
 
-- The production build and TypeScript checks pass. All 55 tests pass, including tests against the freshly built Nitro server.
+- The production build and TypeScript checks pass. All 67 tests pass, including tests against the freshly built Nitro server.
 - `bun audit --json` returned `{}` after the final Nitro dependency installation: no known advisories reported for the resolved lockfile at review time.
-- Five public GET server functions accept no caller-selected destinations, methods, credentials, or account state. The app has no wallet connection, signing, transaction submission, accounts, or database.
+- Six public GET server functions accept no caller-selected destinations, methods, credentials, or account state. The app has no wallet connection, signing, transaction submission, accounts, or database.
 - Provider endpoints and contract addresses are fixed registries. Wrong chain IDs, malformed blocks/events, reorganization mismatches, stale observations, failed providers, and oversized responses fail closed. No synthetic traffic replaces missing observations.
 - Upstream reads enforce timeouts, bounded response bytes, and bounded bridge concurrency. Completed-value caching preserves source timestamps and expires them without renewing freshness. The Node cache has feed-key and TTL allowlists, a 12-entry limit, a 1 MiB entry limit, and a 4 MiB total limit.
 - React escapes displayed values. Canvas text is generated locally. No active HTML injection sink or CSV formula path was found. Emitted client/static files do not intentionally contain environment files, credentials, private keys, or source maps.
@@ -14,7 +14,7 @@ Reviewed 2026-09-27 UTC. Scope: the standalone public application, source and st
 
 ## Verification
 
-`TEST_BUILT_SECURITY=1 bun test tests/*.test.ts` verifies the production SSR entry and exact five-function manifest. Representative requests cover environment/git file paths, encoded traversal, external-looking redirect paths, malformed and unknown functions, cross-site POSTs, wrong methods, and oversized URLs. The test blocks outbound network access and verifies no external redirects or obvious file/stack disclosure. Malformed server-function requests currently return a generic 500; this is an error-status limitation, not a data-disclosure finding.
+`TEST_BUILT_SECURITY=1 bun test tests/*.test.ts` verifies the production SSR entry and exact six-function manifest. Representative requests cover environment/git file paths, encoded traversal, external-looking redirect paths, malformed and unknown functions, cross-site POSTs, wrong methods, and oversized URLs. The test blocks outbound network access and verifies no external redirects or obvious file/stack disclosure. Malformed server-function requests currently return a generic 500; this is an error-status limitation, not a data-disclosure finding.
 
 The application review also verified ten live block sources, actual advancement on repeat observation, source links, selected bridge/settlement events, staking report parsing, selection retained across refreshes, desktop/mobile rendering, and day/night controls. The in-app guide separates execution from settlement, asset bridging from data publication, latest-block counts from TPS/users, and real institutional products from hypothetical expansion.
 
@@ -35,3 +35,12 @@ The main scene now maps documented financial products within a wider contextual 
 Product connections were independently reviewed against primary sources. Wider finance is sector context; no institution's entire assets or future migration is asserted. Decorative pedestrians and vehicles are labeled illustrative, and only supplied network observations produce pulses. Supply failures preserve original observation times and visibly say Last known. Staking cards distinguish a last-known report and include its complete source-check date.
 
 The revised build passes all 55 automated tests, including the five-function production manifest and hostile-request tests. TypeScript checking and dependency audit pass. Desktop and mobile scene views, shop selection, live supply values and network refreshes were visually checked. Public-host verification follows deployment of this revision.
+
+
+## Health-town revision — 2026-09-27 UTC
+
+Added a sixth fixed, read-only GET feed for Ethereum reliability and capacity observations. It verifies Ethereum chain ID, latest/finalized block ordering and fields, a bounded 16-block parent-linked history, timestamp-slot consistency, and a pinned latest-block hash recheck. Every provider response has a 2 MiB limit, requests have 6-second timeouts within a 12-second overall deadline, and the fixed health cache key has a 12-second lifetime. No user input selects the RPC method, endpoint, block history depth, or credentials.
+
+Data display was independently reviewed: finality distance is a timestamp gap, canonical slot coverage is not validator participation, gas capacity uses the actual block limit, blob count avoids unverified capacity constants, and per-network connection failures are separate from zero matching events. Retained samples are labeled Last known with their window. The hall's attention thresholds are disclosed application rules, not network-outage claims. Validator participation and operator concentration remain unmeasured.
+
+All 67 tests pass, including malformed upstream values, reorg/history inconsistencies, partial provider capabilities, failure retention and the six-function built server boundary. TypeScript, the production build, dependency audit and credential-pattern scan pass. Desktop/phone selection, live readings and actual capacity history were checked. Rendering additions use existing Three.js add-ons; mobile reduces postprocessing and rendering resources are disposed. No new application dependencies, analytics, wallet actions or external visitor-data destinations were introduced.
