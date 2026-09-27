@@ -1,34 +1,27 @@
-# Ethereum Town
-User revision: Ethereum bullish ecosystem illustration, with Ethereum a central town hall and connected L2 neighborhoods. Original live visualization only; no video.
-Concept: Many neighborhoods. One Ethereum foundation.
-Scope: Ethereum L1, Base, Arbitrum One, OP Mainnet, Starknet, ZKsync Era and Linea.
-Visual: Monumental Ethereum civic hall, diamond, central plaza, six radial neighborhoods, physical bridge spokes and water channels. Original procedural geometry.
-Meaning: Building sizes are architectural roles, not metrics. L2s execute locally; Ethereum supplies data and settlement services. Hall does not govern L2s.
-Data: growthepie txcount, latest common completed UTC day across all seven. Selected L2 aggregate separated from Ethereum L1 count. Exact sourced baseline retained on failure.
-Animation: Local crowds use one shared linear transaction scale. Equal bridge packets illustrate settlement connections, not asset flows, fees, batches or proofs measured.
-Backend: Public read-only data, 15-minute refresh check, bounded fetch, no accounts or secrets.
-Palette: Sky-blue canal, pale civic stone, Ethereum periwinkle, muted network colors. Day/night controls retained.
-Type: Space Grotesk + IBM Plex Mono.
-Interaction: Select town hall or neighborhoods/bridges, inspect daily activity, orbit, zoom, pause, speed, day/night, source ledger, CSV.
-Accessibility: Keyboard navigation, reduced-motion pause, readable data fallback.
-Mobile: Dedicated scene viewport, compact scrollable information card, concise connection legend.
-Assets: Original 3D scene, updated real scene cover and Ethereum-inspired diamond favicon.
-Reference: Ryan Sael Token Town (https://sael.net/token-town/); original code/assets, no affiliation.
-Integrity: Not a token price forecast. Transactions are not users or dollars. No false bridge flows, no relabeling L2 transactions as L1.
-Existing scroll film engine remains unused and preserved because user explicitly asked for a live visualization.
-Same existing hosted link. No community feed listing requested.
+# Ethereum Town design brief
 
-Staking revision: Add 30 symbolic validator beacons around the Ethereum plaza and a clickable security foundation. Selecting staking focuses the hall. Pulses illustrate proposals and attestations and respect pause. Labels describe a schematic distributed network.
-Stakingmetric: Reported Total ETH staked from ethereum.org/staking, with a source-checked timestamp. The source publishes no metric timestamp or epoch. Kept separate from daily transaction counts.
+Ethereum is the central settlement and consensus foundation of an expanding town. Nine surrounding L2 neighborhoods execute their own transactions and connect to Ethereum through their respective architecture. The civic hall is a visual metaphor, not a claim that Ethereum centrally governs L2s.
 
+## Visual language
 
-## Live Ethereum ecosystem update
-The town consumes public network observations every 30 seconds while visible. Seven independently verified network feeds return latest block hashes, timestamps and transaction counts. Walkers scale from each latest block and update without rebuilding the scene; they are neither people nor TPS comparisons. Failed feeds retain their last observation and visibly become stale.
+A pale stone town hall and Ethereum diamond anchor a radial canal town. Each L2 has its own storefront, awnings and network color, with streets, rooftop terraces, trees, planters, bicycles and moving block-activity crowds. Neighborhood selection brings the camera closer; an overview exposes the wider network. Day and night modes, warm windows and street lamps make the scene feel inhabited. Buildings and bridges are architectural, not scaled financial metrics.
 
-Connections use observed Ethereum events over a rolling 100-block window. Six selected L2 data/state routes are monitored. Base, OP Mainnet and Arbitrum also have selected canonical asset bridge coverage. Base and OP blob submissions are sampled and independently verified against Ethereum transactions, receipts and blocks. Every packet refers to a sourced, timestamped observation. Initial packets replay the observed window; repeated IDs are deduplicated. No synthetic traffic or inferred dollar volumes.
+The style is inspired by Ryan Sael's Token Town (https://sael.net/token-town/), with original code and procedural geometry. There is no affiliation with the named networks or institutions.
 
-The outer financial district contains selected documented products: JPM Coin on Base, BlackRock BUIDL on Ethereum, Franklin Templeton BENJI on Arbitrum and a Visa stablecoin settlement pilot. Static paths document relationships, not money flows. Banks and insurance are explicitly hypothetical expansion opportunities, not commitments and not assertions that their entire sectors are unconnected.
+## Data meaning
 
-ETH staking is separate from block activity. ethereum.org's reported eligible-ETH-at-stake figure is rechecked every 15 minutes. The source does not publish its measurement epoch; the UI distinguishes the check time from the measurement time. Validator beacons are symbolic.
+Ethereum, Base, Arbitrum One, OP Mainnet, Starknet, ZKsync Era, Linea, Mantle, Ink and Unichain have mainnet block observations checked every 30 seconds while visible. Crowds use the latest block's transaction count and a shared rounded scale. They are not unique people, dollars, or a TPS ranking. Updates preserve camera and selection; missing feeds retain a dated, stale observation.
 
-The activity and sources dialog exposes live block observations, source endpoints, connection coverage and events, timestamps and finality limits, downloadable block CSV, reported staking provenance, and separately labeled historical daily counts. Pause/speed controls change animation only.
+Moving packets correspond to verified selected Ethereum bridge or infrastructure observations in a rolling 100-block window. Initial packets replay that window, and repeated IDs are deduplicated. Asset bridging, data publication, commitments, and state updates have distinct labels. Six L2 infrastructure routes and three selected canonical asset-bridge routes are configured; unsupported routes have no measured packets. Packet speed is an animation setting.
+
+Thirty symbolic validator beacons ring the Ethereum plaza. A separate staking card shows ethereum.org's reported eligible ETH at stake, checked every 15 minutes with a clear measurement-time caveat. Liquid-staking receipt tokens are not added to the stake total.
+
+The outer financial district shows documented selected products for J.P. Morgan, BlackRock, and Franklin Templeton, a documented Visa pilot, and explicitly hypothetical banks/insurance opportunities. Solid, dotted, and dashed static routes communicate these statuses; they are not measured asset flows. The Economy guide covers stablecoins, DeFi, tokenized assets, liquid staking, data availability and app-specific rollups without fabricated live metrics.
+
+## Interaction and accessibility
+
+Select buildings or navigation tabs; use previous/next neighborhood controls, drag to orbit, scroll to zoom, pause, speed, and day/night. A native modal explains how to read the town and exposes source links, coverage, exact observations, timestamps, finality limits, downloadable block CSV and separately labeled historical counts. It supports Escape, focus restoration and a sticky close control. Mobile uses horizontal navigation and a scrollable bottom card. Reduced-motion preference pauses animation; data continues refreshing.
+
+## Hosting and integrity
+
+Public Vercel hosting, private source repository on GitHub, no visitor login. The product is read-only and has no wallet, signing or transaction flow. Selected ecosystem coverage is stated explicitly. It presents an Ethereum-centered ecosystem story without inflating numbers, inventing traffic, claiming institutional commitments, or forecasting token prices.

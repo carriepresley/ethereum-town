@@ -23,3 +23,7 @@ The application review also verified ten live block sources, actual advancement 
 The displayed ecosystem is a selected sample. Six of nine L2s have selected infrastructure monitoring; three have selected canonical asset-bridge monitoring. All ten displayed networks have block feeds. Public RPC services are rate-limited and offer no application-specific uptime guarantee. Node caches are per warm instance, so a high-traffic launch may require dedicated provider capacity and shared caching. No sustained load test, provider attack, external penetration test, or hosting-infrastructure audit was performed.
 
 The reported staking figure has no published measurement timestamp; the app labels the source-check time and does not call it a live validator-balance calculation. Latest blocks and event inclusion are not promises of consensus finality. Production access, metadata, static assets and feed refreshes are checked separately after deployment.
+
+## Public release verification
+
+The production Vercel alias https://ethereumtown.vercel.app returned HTTP 200 without cookies or authentication and rendered the town in a fresh browser tab. Its canonical URL, security headers and GitHub-linked production deployment were verified. The browser showed all ten network feeds current, timestamped verified connection events, the Economy guide and no captured JavaScript errors or warnings. The source repository is private; the website is public.
