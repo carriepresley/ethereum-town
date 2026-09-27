@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /_serverFn/
+Sitemap: https://ethereumtown.vercel.app/sitemap.xml

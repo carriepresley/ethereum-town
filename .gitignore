@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.output/
+.nitro/
+.vercel/
+.openai/
+.sites-runtime/
+.env*
+!.env.example
+.DS_Store
