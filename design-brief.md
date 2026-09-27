@@ -1,27 +1,15 @@
-# Ethereum Town design brief
+# Financial city design
 
-Ethereum is the central settlement and consensus foundation of an expanding town. Nine surrounding L2 neighborhoods execute their own transactions and connect to Ethereum through their respective architecture. The civic hall is a visual metaphor, not a claim that Ethereum centrally governs L2s.
+Ethereum Town is a walkable city of financial products, not a race between network transaction counters. It is inspired by Ryan Sael's Token Town street-level shopfronts, warm windows, tiny road life, close cameras and compact information cards. Code and procedural assets are original.
 
-## Visual language
+The connected quarter contains nine recognizable product storefronts, eight documented live products/protocols and one documented live pilot. The broader financial world surrounds this quarter through six inhabited sector buildings. They do not imply unconnected named institutions, migration commitments, or an Ethereum share of global finance. Their scale is architectural.
 
-A pale stone town hall and Ethereum diamond anchor a radial canal town. Each L2 has its own storefront, awnings and network color, with streets, rooftop terraces, trees, planters, bicycles and moving block-activity crowds. Neighborhood selection brings the camera closer; an overview exposes the wider network. Day and night modes, warm windows and street lamps make the scene feel inhabited. Buildings and bridges are architectural, not scaled financial metrics.
+Ethereum's civic hall and symbolic staking foundation anchor the district. L2 transit routes sit behind the products as shared infrastructure. Static mint-colored roads show documented connections and amber identifies a pilot. Only observed network events emit moving light pulses; vehicles and pedestrians are plainly illustrative.
 
-The style is inspired by Ryan Sael's Token Town (https://sael.net/token-town/), with original code and procedural geometry. There is no affiliation with the named networks or institutions.
+The whole-city view establishes context. On Ethereum and Wider finance controls move the camera and update the navigation without deleting the other district. Shop selection gives a closer street view and a compact card explaining its product, selected network, source and scope. Circle and Tether expose their direct Ethereum contract supplies. Other products get documented status rather than fabricated activity metrics.
 
-## Data meaning
+Dusk is the default: charcoal streets, warm connected shops, awnings, large upper windows, flowers, cafés, bicycles, crosswalks and lamps. Taller surrounding sector buildings have cooler light. Day mode remains available. Desktop uses a lower-left card and unobstructed central canvas. Mobile starts closer inside the district, provides a scrollable bottom card and supports pinch zoom.
 
-Ethereum, Base, Arbitrum One, OP Mainnet, Starknet, ZKsync Era, Linea, Mantle, Ink and Unichain have mainnet block observations checked every 30 seconds while visible. Crowds use the latest block's transaction count and a shared rounded scale. They are not unique people, dollars, or a TPS ranking. Updates preserve camera and selection; missing feeds retain a dated, stale observation.
+A native About & data dialog provides mapping rules, product evidence, source timestamps, network observations, bridge coverage and staking limitations. It supports keyboard access, Escape dismissal and focus restoration. Animation pause/speed does not stop data updates. Reduced-motion preference pauses animation.
 
-Moving packets correspond to verified selected Ethereum bridge or infrastructure observations in a rolling 100-block window. Initial packets replay that window, and repeated IDs are deduplicated. Asset bridging, data publication, commitments, and state updates have distinct labels. Six L2 infrastructure routes and three selected canonical asset-bridge routes are configured; unsupported routes have no measured packets. Packet speed is an animation setting.
-
-Thirty symbolic validator beacons ring the Ethereum plaza. A separate staking card shows ethereum.org's reported eligible ETH at stake, checked every 15 minutes with a clear measurement-time caveat. Liquid-staking receipt tokens are not added to the stake total.
-
-The outer financial district shows documented selected products for J.P. Morgan, BlackRock, and Franklin Templeton, a documented Visa pilot, and explicitly hypothetical banks/insurance opportunities. Solid, dotted, and dashed static routes communicate these statuses; they are not measured asset flows. The Economy guide covers stablecoins, DeFi, tokenized assets, liquid staking, data availability and app-specific rollups without fabricated live metrics.
-
-## Interaction and accessibility
-
-Select buildings or navigation tabs; use previous/next neighborhood controls, drag to orbit, scroll to zoom, pause, speed, and day/night. A native modal explains how to read the town and exposes source links, coverage, exact observations, timestamps, finality limits, downloadable block CSV and separately labeled historical counts. It supports Escape, focus restoration and a sticky close control. Mobile uses horizontal navigation and a scrollable bottom card. Reduced-motion preference pauses animation; data continues refreshing.
-
-## Hosting and integrity
-
-Public Vercel hosting, private source repository on GitHub, no visitor login. The product is read-only and has no wallet, signing or transaction flow. Selected ecosystem coverage is stated explicitly. It presents an Ethereum-centered ecosystem story without inflating numbers, inventing traffic, claiming institutional commitments, or forecasting token prices.
+Public Vercel hosting remains at https://ethereumtown.vercel.app with private GitHub source. No login, wallet or transaction flows.

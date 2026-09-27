@@ -232,7 +232,7 @@ describe('bounded Node completed-value cache',()=>{
    await expect(publicFeedCache(throws)).rejects.toThrow('source offline');expect(failures).toBe(4)
   })
  })
- test('only the three approved public feeds and their bounded TTLs are cached',async()=>{
+ test('only approved public feeds and their bounded TTLs are cached',async()=>{
   await withoutCloudflare(async()=>{
    let calls=0
    const o=options('node-allowlist',async()=>({capturedAt:observed(),status:'ok',count:++calls}))

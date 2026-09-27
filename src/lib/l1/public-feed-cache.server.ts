@@ -16,6 +16,7 @@ const PUBLIC_FEEDS: Readonly<Record<string, number>> = Object.freeze({
   'telemetry-10-networks': 12,
   'selected-bridges': 12,
   'reported-staking': 900,
+  'ethereum-stablecoin-supply': 60,
 })
 export const NODE_PUBLIC_CACHE_LIMITS = Object.freeze({entries: 12, entryBytes: 1_048_576, totalBytes: 4_194_304})
 

@@ -1,7 +1,7 @@
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {Outlet,Link,createRootRouteWithContext,HeadContent,Scripts} from '@tanstack/react-router';
 import type {ReactNode} from 'react';
-import appCss from '../styles.css?url';
+import appCss from '../financial-city.css?url';
 import meta from '../app-meta.json';
 function Shell({children}:{children:ReactNode}){return <html lang="en"><head><HeadContent/></head><body>{children}<Scripts/></body></html>}
 function Root(){const {queryClient}=Route.useRouteContext();return <QueryClientProvider client={queryClient}><Outlet/></QueryClientProvider>}
