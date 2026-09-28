@@ -13,7 +13,7 @@ const AVG_BURN = REPLAY.reduce((s, b) => s + b.burn, 0) / REPLAY.length;
 const ST = {
   mode: 'replay', T: -2.6, speed: 1, paused: RM, sky: 'now', hourSet: 13, stop: 0, tour: false, tourT: 0,
   cumBurn: 0, supply0: D.supply.supply, issuePerSlot: D.supply.issuedPerDay / 7200, liveK0: null, lastLiveN: 0, lastK: null,
-  started: performance.now(), nightF: 0, burnLevel: 0.4, bitmineRate: (D.bitmine.staked * (D.staking.apr / 100)) / (365 * 86400),
+  started: performance.now(), nightF: 0, burnLevel: 0.4,
 };
 const LIVE = new Map(); // slot k -> block
 function blockFor(k) {
@@ -195,26 +195,27 @@ function onDepart(k, b) {
 }
 function epochPayout(b) {
   toast([44, 5.4, 14], `Epoch ${fmt(Math.floor(b.slot / 32))} · staking rewards credited`, 'gold');
-  for (let i = 0; i < 26; i++) sendReward(rand() < D.bitmine.stakeShare, -R(0, 0.45)); // a burst at the epoch boundary
+  for (let i = 0; i < 26; i++) sendReward(-R(0, 0.45)); // a burst at the epoch boundary
 }
-/* ---------- staking rewards: gold sparks leave the vault for every staker ----------
-   Bitmine's share travels through the gold pipe to its tower; the rest go to the homes on the hill,
-   standing in for every other staker. A steady trickle, with a burst at each epoch. */
+/* ---------- staking rewards: gold sparks leave the vault for the stakers ----------
+   The homes on the hill stand in for everyone who stakes. A steady trickle, with a burst at each epoch. */
 const REWARDS = [];
 let rewardT = 0.5;
 const _rw = new THREE.Vector3();
 function rewardArc() {
-  const p0 = new THREE.Vector3(R(41.5, 46.5), 4.25, R(12.7, 14.3)), p2 = new THREE.Vector3(R(40.8, 50.4), 1.45, R(1.0, 2.9));
+  const east = rand() < 0.25; // a few head for the homes on the east edge
+  const p0 = new THREE.Vector3(R(41.5, 46.5), 4.25, R(12.7, 14.3));
+  const p2 = east ? new THREE.Vector3(R(49.6, 51.2), 1.35, R(8.6, 12.8)) : new THREE.Vector3(R(40.8, 50.4), 1.45, R(1.0, 2.9));
   return new THREE.QuadraticBezierCurve3(p0, new THREE.Vector3((p0.x + p2.x) / 2, 7.2, (p0.z + p2.z) / 2), p2);
 }
-function sendReward(toBitmine, u0 = 0) {
+function sendReward(u0 = 0) {
   if (REWARDS.length > 60) return;
-  REWARDS.push({ curve: toBitmine ? STAKE_PIPE_BACK : rewardArc(), u: u0, speed: toBitmine ? R(0.3, 0.38) : R(0.34, 0.5) });
+  REWARDS.push({ curve: rewardArc(), u: u0, speed: R(0.34, 0.5) });
 }
 function updateRewards(dt) {
   if (dt <= 0) return;
   rewardT -= dt;
-  if (rewardT <= 0) { rewardT = R(0.4, 0.75); sendReward(rand() < D.bitmine.stakeShare); }
+  if (rewardT <= 0) { rewardT = R(0.4, 0.75); sendReward(); }
   for (let i = REWARDS.length - 1; i >= 0; i--) {
     const r = REWARDS[i]; r.u += dt * r.speed;
     if (r.u >= 1) { REWARDS.splice(i, 1); continue; }
@@ -234,7 +235,6 @@ function updateFx(dt, T) {
   smoke.update(dt); flames.update(dt); sparkles.update(dt);
   if (clockHand) clockHand.rotation.z = -((((T % 12) + 12) % 12) / 12) * Math.PI * 2;
   if (ethGem) { ethGem.rotation.y += dt * 0.6; ethGem.position.y = 7.35 + Math.sin(T * 0.8) * 0.12; }
-  if (beaconLight) beaconLight.material.emissiveIntensity = (Math.sin(T * 3.1) > 0.6 ? 3 : 0.3);
   for (const g of GATES) {
     const target = gatesClosed ? 0 : Math.PI / 2 - 0.05;
     g.angle += clamp(target - g.angle, -dt * 1.8, dt * 1.8);

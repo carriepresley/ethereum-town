@@ -112,12 +112,6 @@ DATA={
             "entryQ":last["entry_queue"],"entryWait":last["entry_wait"],"exitQ":last["exit_queue"],"exitWait":last["exit_wait"],"churn":256,"sweepDays":7.7,"hist":hist,
             # fact-check on Sep 28: ~99% of the exit line was EIP-7251 consolidations (ETH stays staked); ~1.9K ETH was really leaving
             "exitNote":{"date":"Sep 28, 2026","consolidationShare":0.99,"unstakingEth":1900}},
- # Bitmine weekly press release of Sep 28, 2026 (holdings as of Sep 27, 3pm ET) and Sep 21, 2026 (as of Sep 20)
- "bitmine":{"holdings":6001302,"holdingsDate":"Sep 27, 2026","staked":5067309,"prevHoldings":5983940,"prevDate":"Sep 20, 2026",
-            "statedAnnualStakingUsd":358000000,"releaseDate":"Sep 28, 2026",
-            "releaseUrl":"https://www.prnewswire.com/news-releases/bitmine-immersion-technologies-bmnr-announces-eth-holdings-reach-over-6-million-tokens-with-total-crypto-cash--marketable-securities-holdings-of-17-2-billion-302891056.html",
-            "prevReleaseUrl":"https://www.prnewswire.com/news-releases/bitmine-immersion-technologies-bmnr-announces-eth-holdings-reach-5-98-million-tokens-and-total-crypto-and-total-cash-holdings-of-17-1-billion-302884434.html",
-            "supplyShare":round(6001302/122082026,4),"stakeShare":round(5067309/last["staked_amount"],4)},
  "l2":shops,"l2agg":l2agg,
  "stables":{"eth":148.4e9,"all":313.1e9,"share":0.474,"ethYoY":-0.063,"allYoY":0.057},
 }

@@ -295,7 +295,7 @@ function buildShop(s, idx) {
 }
 
 /* ================= civic buildings ================= */
-let clockHand, ethGem, bitmineScreen, supplyScreen, furnaceMouth, beaconLight, vaultDoors;
+let clockHand, ethGem, supplyScreen, furnaceMouth, vaultDoors;
 const CIVIC = {};
 function buildStation() {
   const x0 = 22.8, x1 = 33.2, y0 = 21.25, y1 = 23.85, h = 2.25;
@@ -383,57 +383,13 @@ function buildVault() {
   for (const x of [39.7, 48.3]) LAMPS.push({ x, y: 16.4 });
 }
 
-function buildBitmine() {
-  const x0 = 33.2, x1 = 35.8, y0 = 14.7, y1 = 17.3, h = 5.9;
-  beginGroup('bitmine');
-  box(x0, y0, x1, y1, 0, h, '#1c212b', { r: 0.35, m: 0.45 });
-  box(x0 - 0.04, y0 - 0.04, x1 + 0.04, y1 + 0.04, 0, 0.12, '#c9973a', { m: 0.7, r: 0.35, cast: false });
-  // gold fins
-  const gold = M('#c9973a', { m: 0.75, r: 0.32 });
-  for (let u = 0.25; u < 2.6; u += 0.45) {
-    box(x0 + u - 0.03, y1, x0 + u + 0.03, y1 + 0.06, 1.2, h - 0.35, null, { material: gold });
-    box(x1, y1 - u - 0.03, x1 + 0.06, y1 - u + 0.03, 1.2, h - 0.35, null, { material: gold });
-  }
-  windowGrid(x0, y0, x1, y1, ['E', 'W', 'N'], 1.3, h - 0.6, 0.5, 0.45, 777, { material: WIN_LIT2 });
-  // lobby glass
-  windowOn('S', x0, y0, x1, y1, 0.2, 2.4, 0.15, 1.0, WIN_LIT2);
-  box(x0 + 1.05, y1 - 0.01, x0 + 1.55, y1 + 0.05, 0.1, 0.95, '#141820', { cast: false });
-  // crown
-  const crown = glowMat('#e4b34f', 0.5, 1.6);
-  box(x0 - 0.03, y0 - 0.03, x1 + 0.03, y1 + 0.03, h - 0.22, h - 0.1, null, { material: crown, cast: false });
-  box(x0, y0, x1, y1, h, h + 0.12, '#2a303b');
-  cyl(34.5, 16, 0.04, h + 0.12, h + 1.7, '#cfd4db', { m: 0.6, r: 0.3 }, 6);
-  beaconLight = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), new THREE.MeshStandardMaterial({ color: '#ff4b3e', emissive: '#ff2a1a', emissiveIntensity: 2 }));
-  beaconLight.position.set(34.5, h + 1.75, 16); addObj(beaconLight);
-  // name + LED screen
-  const tex = signTexture('BITMINE', '#1c212b', '#f1c465', { spacing: 14, weight: 900 });
-  signPlane(tex, 'S', 34.5, y1 + 0.07, 5.15, 2.3, 0.44, [0.5, 2.2]);
-  const sc = textCanvas(512, 256);
-  const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
-  bitmineScreen = { canvas: sc, tex: st, last: -1 };
-  const scrMat = new THREE.MeshStandardMaterial({ map: st, emissive: '#ffffff', emissiveMap: st, emissiveIntensity: 0.9, roughness: 0.5 });
-  nightMat(scrMat, 0.9, 1.6);
-  const scr = new THREE.Mesh(SIGN_GEO, scrMat); scr.scale.set(2.2, 1.1, 1); scr.position.set(34.5, 3.2, y1 + 0.08); addObj(scr);
-  CIVIC.bitmine = endGroup();
-  addProxy({ type: 'bitmine' }, x0, y0, x1, y1, h + 0.5);
+/* the corner lot next to the vault: a small pocket park */
+function buildPocketPark() {
+  box(33.05, 14.65, 35.95, 17.35, 0.025, 0.05, COLORS.park, { cast: false });
+  box(33.05, 15.85, 35.95, 16.15, 0.05, 0.058, COLORS.paved, { cast: false });
+  for (const [x, y] of [[33.55, 15.1], [35.35, 15.2], [33.7, 16.85], [35.2, 16.9], [34.45, 14.95]]) addTree(x, y, R(0.75, 1.0), 'round');
+  for (const x of [33.9, 35.0]) { box(x - 0.28, 16.22, x + 0.28, 16.34, 0.2, 0.24, '#8a6a4d'); box(x - 0.28, 16.32, x + 0.28, 16.36, 0.24, 0.42, '#8a6a4d', { cast: false }); }
   LAMPS.push({ x: 32.65, y: 18.4 });
-}
-
-/* the stake link: Bitmine's staked ETH sits in the Beacon Vault, and its share of rewards flows back */
-const STAKE_PIPE = new THREE.CatmullRomCurve3([
-  new THREE.Vector3(35.86, 3.3, 15.55), new THREE.Vector3(36.95, 3.95, 15.08), new THREE.Vector3(38.55, 3.95, 14.22), new THREE.Vector3(40.05, 2.62, 13.45),
-]);
-const STAKE_PIPE_BACK = new THREE.CatmullRomCurve3(STAKE_PIPE.points.slice().reverse());
-function buildStakePipe() {
-  const glass = nightMat(new THREE.MeshStandardMaterial({ color: '#f3d489', emissive: '#e4b34f', emissiveIntensity: 0.12, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.42, depthWrite: false }), 0.12, 0.6);
-  const tube = new THREE.Mesh(new THREE.TubeGeometry(STAKE_PIPE, 48, 0.1, 12, false), glass);
-  tube.renderOrder = 1; scene.add(tube);
-  const gold = M('#c9973a', { m: 0.75, r: 0.32 });
-  for (const u of [0.015, 0.985]) {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.16, 14), gold);
-    c.position.copy(STAKE_PIPE.getPointAt(u)); c.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), STAKE_PIPE.getTangentAt(u)); c.castShadow = true;
-    scene.add(c);
-  }
 }
 
 function buildBurn() {

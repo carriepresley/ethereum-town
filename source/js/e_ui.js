@@ -102,11 +102,10 @@ function makeLabels() {
 const INFO = [
   { v: new THREE.Vector3(43.1, 0.95, 16.95), cls: 'in', go: 'vault', text: () => `Waiting to stake · ${compact(D.staking.entryQ, 2)} ETH` },
   { v: new THREE.Vector3(47.7, 0.85, 16.75), cls: 'out', go: 'vault', text: () => `Waiting to exit · ${compact(D.staking.exitQ, 0)} ETH` },
-  { v: new THREE.Vector3(38.2, 4.55, 14.45), cls: 'gold', go: 'bitmine', text: () => `Bitmine’s stake · ${compact(D.bitmine.staked, 2)} ETH` },
-  { v: new THREE.Vector3(45.6, 2.5, 2.2), cls: 'gold', go: 'vault', only: 'vault', text: () => 'Rewards to other stakers' },
+  { v: new THREE.Vector3(45.6, 2.5, 2.2), cls: 'gold', go: 'vault', only: 'vault', text: () => 'Staking rewards → stakers' },
 ];
 const _pv = new THREE.Vector3();
-const PRIO = { station: 1, vault: 2, burn: 3, bitmine: 4 };
+const PRIO = { station: 1, vault: 2, burn: 3 };
 // panels that labels should not peek out from under (refreshed a few times a second)
 let panelRects = [], panelT = 0;
 function refreshPanels() {
@@ -138,7 +137,7 @@ function updateLabels() {
   }
   const sel = STOPS[ST.stop] && STOPS[ST.stop].type;
   for (const I of INFO) {
-    const want = !ST.uiHidden && (I.only ? sel === I.only : (sel === 'vault' || sel === 'bitmine' || camera.position.distanceTo(I.v) < 30));
+    const want = !ST.uiHidden && (I.only ? sel === I.only : (sel === 'vault' || camera.position.distanceTo(I.v) < 30));
     let show = false, x = 0, y = 0;
     if (want) {
       _pv.copy(I.v).project(camera);
@@ -200,18 +199,6 @@ function updateSupply() {
     g.fillStyle = '#ffc55c'; g.font = `900 132px ${'"Doto",monospace'}`; g.textAlign = 'center'; g.textBaseline = 'middle';
     g.fillText(fmt(s, 0), c.width / 2, c.height / 2 + 6);
     supplyScreen.tex.needsUpdate = true;
-  }
-  const bm = ST.bitmineRate * Math.max(0, ST.T);
-  const el = document.getElementById('bmLive'); if (el) el.textContent = bm.toFixed(3);
-  if (bitmineScreen && Math.floor(ST.T * 2) !== bitmineScreen.last) {
-    bitmineScreen.last = Math.floor(ST.T * 2);
-    const c = bitmineScreen.canvas, g = c.getContext('2d');
-    g.fillStyle = '#0b0e14'; g.fillRect(0, 0, 512, 256);
-    g.fillStyle = '#8f7a4a'; g.font = `700 30px ${UI}`; g.textAlign = 'center';
-    g.fillText('EST. STAKING REWARDS', 256, 52); g.fillText('SINCE YOU ARRIVED', 256, 88);
-    g.fillStyle = '#ffd27a'; g.font = `900 92px "Doto",monospace`; g.fillText('+' + bm.toFixed(3), 256, 170);
-    g.fillStyle = '#c9a45a'; g.font = `700 30px ${UI}`; g.fillText('ETH  ·  ≈1 IN ' + Math.round(1 / D.bitmine.stakeShare) + ' BLOCKS', 256, 228);
-    bitmineScreen.tex.needsUpdate = true;
   }
 }
 
@@ -311,8 +298,6 @@ const SRC = {
   eip4844: ['EIP-4844', 'https://eips.ethereum.org/EIPS/eip-4844', 'blobs'],
   eip7918: ['EIP-7918', 'https://eips.ethereum.org/EIPS/eip-7918', 'the blob fee floor'],
   eip7251: ['EIP-7251', 'https://eips.ethereum.org/EIPS/eip-7251', 'validator consolidations'],
-  bm: () => [`Bitmine press release · ${D.bitmine.releaseDate}`, D.bitmine.releaseUrl, `holdings and staked ETH as of ${D.bitmine.holdingsDate}`],
-  bmPrev: () => ['Bitmine press release · Sep 21, 2026', D.bitmine.prevReleaseUrl, `holdings as of ${D.bitmine.prevDate}`],
 };
 
 /* ---------- L2 background, paraphrased from each project's L2BEAT page ---------- */
@@ -364,14 +349,12 @@ function overviewCard() {
   const top = [...D.l2].sort((x, y) => y.uops - x.uops)[0];
   const two = D.blobShares.filter((x) => x.key !== 'other').slice(0, 2);
   const blobWin = D.blobLive ? `in the last ${hoursLabel(D.l1.blobSourceDays)}` : 'in the 24 hours to Sep 28';
-  const oneIn = Math.round(1 / D.bitmine.stakeShare);
   const map = [
     ['station', '#4453d0', 'Mainnet Station', 'Ethereum’s base layer (L1). A train leaves every 12 seconds, and each one is a real block.'],
     ['l2', 'conic-gradient(#0052ff 0 25%, #ff0420 0 50%, #c6f500 0 75%, #f50db4 0)', `The ${SHOPS.length} shops`, `The busiest L2 networks by activity on L2BEAT. Taller means more value secured; a bigger crowd means more activity.`],
     [null, '#c7ad86', 'Trucks and couriers', `${nBlob} of the ${SHOPS.length} post their data to Ethereum as blobs and send trucks to the station. The other ${nOff} keep their data elsewhere and send couriers.`],
     ['vault', '#bcd0ff', 'Beacon Vault', 'Staking: validators lock ETH here to secure the chain. The people lined up outside are ETH waiting to be staked; gold sparks are rewards.'],
     ['burn', '#ff7a3d', 'The Burn', 'Where fees are burned. The tower next door keeps a running count of all ETH in existence.'],
-    ['bitmine', '#e4b34f', 'Bitmine', `A public company that stakes about 1 in ${oneIn} of all staked ETH. A gold pipe links it to the vault, where that stake sits.`],
   ];
   const facts = [
     `<b>${top.name}</b> accounts for about ${Math.round(top.uops / a.uops * 100)}% of all L2 activity that L2BEAT tracks.`,
@@ -472,7 +455,6 @@ function l2Card(shop) {
 function vaultCard() {
   const s = D.staking, hist = s.hist, sp = D.supply;
   const issueShare = clamp(Math.floor((sp.issuedPerDay * 365) / s.staked / (s.apr / 100) * 100) / 100, 0, 1);
-  const oneIn = Math.round(1 / D.bitmine.stakeShare);
   const capped = s.entryQ / 20000 > 96 || s.exitQ / 20000 > 16;
   const xn = s.exitNote;
   return head('Consensus layer · Staking', 'Beacon Vault', 'Proof of stake: validators lock ETH as collateral to propose and attest to blocks. They earn rewards for doing it honestly and can lose part of their stake (slashing) for provable misbehavior.', '#bcd0ff')
@@ -484,7 +466,7 @@ function vaultCard() {
     + seeList([
       `<b>The people lined up outside</b> are ETH waiting to be staked, about 20,000 ETH per figure. The front of the line walks in through the <b>IN</b> door and newcomers join the back; the line’s length is real, the pace is sped up (the real line moves about one figure every ${Math.round(20000 / s.churn * 6.4 / 60)} hours).${capped ? ' The lines stop growing at 96 and 9 figures.' : ''}`,
       '<b>The short row by the OUT door</b> is the exit queue: figures come out of the vault and head for the street.',
-      `<b>Gold sparks leaving the vault</b> are staking rewards, with a burst every epoch (6.4 minutes). About 1 in ${oneIn} flow through the gold pipe to Bitmine, whose staked ETH sits in here too; the rest go to the homes on the hill, standing in for every other staker.`,
+      `<b>Gold sparks leaving the vault</b> are staking rewards, with a burst every epoch (6.4 minutes). They fly to the homes on the hill, standing in for everyone who stakes: ${fmt(s.validators)} validators share them.`,
     ])
     + `<div class="block"><h3>Entry queue, last 90 days (ETH)</h3>${spark(hist.map((r) => r[1]), { zero: true, fmt: (v) => compact(v, 2) + ' ETH', labelAt: (i) => '· ' + hist[i][0], left: hist[0][0], right: hist[hist.length - 1][0], aria: 'Entry queue over 90 days' })}</div>`
     + `<div class="block"><h3>Exit queue, last 90 days (ETH)</h3>${spark(hist.map((r) => r[2]), { zero: true, fmt: (v) => compact(v, 1) + ' ETH', labelAt: (i) => '· ' + hist[i][0], left: hist[0][0], right: hist[hist.length - 1][0], aria: 'Exit queue over 90 days' })}</div>`
@@ -493,28 +475,6 @@ function vaultCard() {
       xn ? `<b>About the exit line:</b> on ${xn.date}, about ${Math.round(xn.consolidationShare * 100)}% of it was validators merging into bigger ones (consolidations, EIP-7251). That ETH stays staked; only about ${fmt(xn.unstakingEth)} ETH was actually leaving staking.` : '',
       `<b>The staking rate</b> comes from beaconcha.in’s ETH.STORE index. About ${Math.round(issueShare * 100)}% of it is newly issued ETH and the rest is priority fees; MEV payments aren’t counted, so all-in returns run slightly higher.`))
     + sourceList([SRC.vq, SRC.ethstore, SRC.eoPos, SRC.eoStaking, SRC.eip7251], asOf() + '.');
-}
-
-/* ---------- Bitmine ---------- */
-function bitmineCard() {
-  const b = D.bitmine, share = b.stakeShare, perDay = ST.bitmineRate * 86400;
-  const added = b.holdings - b.prevHoldings;
-  return head('ETH treasury company · Staking', 'Bitmine Staking &amp; Rewards', 'Bitmine Immersion Technologies (NYSE: BMNR) is a public company that holds ETH as its main treasury asset and stakes most of it, so its validators propose blocks and earn rewards like any other staker.', '#e4b34f')
-    + `<div class="stats">${stat('ETH held', compact(b.holdings, 2), (b.supplyShare * 100).toFixed(1) + '% of all ETH · as of ' + b.holdingsDate)}
-      ${stat('ETH staked', compact(b.staked, 2), (share * 100).toFixed(1) + '% of all staked ETH')}
-      ${stat('Share of block proposals', '≈1 in ' + Math.round(1 / share), '≈' + fmt(Math.round(7200 * share / 10) * 10) + ' blocks a day (estimate)')}
-      ${stat('Staking rewards', '≈' + fmt(perDay, 0) + '<small>ETH/day</small>', 'At the ' + D.staking.apr.toFixed(2) + '% network rate (estimate)')}
-      ${stat('Added in the latest week', (added >= 0 ? '+' : '−') + fmt(Math.abs(added)) + '<small>ETH</small>', b.prevDate.replace(', 2026', '') + ' → ' + b.holdingsDate, true)}</div>`
-    + `<div class="block"><h3>Since you opened this page</h3><div class="stat"><div class="v"><span id="bmLive" class="live-counter">0.000</span><small>ETH in estimated rewards</small></div></div></div>`
-    + seeList([
-      `<b>The tower is Bitmine’s treasury:</b> the ${compact(b.holdings, 2)} ETH it holds. <b>The gold pipe</b> runs to the Beacon Vault, because the ${compact(b.staked, 2)} ETH it stakes sits there alongside everyone else’s.`,
-      `<b>Rewards flow back through the pipe:</b> about 1 in ${Math.round(1 / share)} of the gold sparks leaving the vault. The screen counts its estimated rewards since you opened the page.`,
-      '<b>Despite the name, nothing is mined here.</b> Ethereum replaced mining with staking in 2022, so new ETH now comes from staking rewards.',
-    ])
-    + block('How the estimates work', paras(
-      `Validators are picked to propose blocks at random in proportion to their stake, so a staker with ${(share * 100).toFixed(1)}% of staked ETH should propose about that share of blocks over time. Estimated rewards are its staked ETH times the network’s average staking rate; actual results depend on validator performance, MEV and fees.`,
-      `Bitmine says it stakes through MAVAN (its “Made in America Validator Network”) and staking partners, buys ETH every week, and aims to hold 5% of all ETH. In its ${b.releaseDate} release it projected about $${Math.round(b.statedAnnualStakingUsd / 1e6)}M a year in staking revenue.`))
-    + sourceList([SRC.bm(), SRC.bmPrev(), SRC.vq, SRC.eoStaking], 'Company figures are self-reported in weekly press releases. Proposal share and rewards are estimates. Nothing here is investment advice.');
 }
 
 /* ---------- The Burn ---------- */
@@ -547,7 +507,6 @@ function renderCard() {
   else if (s.type === 'station') html = stationCard();
   else if (s.type === 'l2') html = l2Card(s.shop);
   else if (s.type === 'vault') html = vaultCard();
-  else if (s.type === 'bitmine') html = bitmineCard();
   else html = burnCard();
   card.innerHTML = html;
   card.scrollTop = 0;
@@ -575,7 +534,6 @@ function buildStops() {
     STOPS.push({ type: 'l2', name: s.name, shop: s, group: s.grp, anchor: [s.cx, s.h + 1.05, s.cy], view: { t: [s.cx, Math.min(2.6, s.h * 0.4), s.y1 + 0.3], d: 12.5 + s.h * 1.45, p: s.row === 2 ? 0.8 : 0.92, a: behindStation ? (s.cx > 27.5 ? 1.05 : -0.75) : 0.55 } });
   }
   STOPS.push({ type: 'vault', name: 'Beacon Vault', short: 'Beacon Vault', group: CIVIC.vault, anchor: [44, 4.9, 14], view: { t: [42.4, 1.5, 15.7], d: 24, p: 0.86, a: -0.45 } });
-  STOPS.push({ type: 'bitmine', name: 'Bitmine Staking & Rewards', short: 'Bitmine', group: CIVIC.bitmine, anchor: [34.5, 7.9, 16], view: { t: [37.2, 2.8, 15.6], d: 22, p: 0.93, a: 0.55 } });
   STOPS.push({ type: 'burn', name: 'The Burn', short: 'The Burn · Supply', group: CIVIC.burn, anchor: [45.2, 9.6, 22.8], view: { t: [43.3, 2.8, 23.0], d: 22, p: 0.98, a: 0.62 } });
 }
 let fly = null;
@@ -631,7 +589,6 @@ function selectStop(i, fromTour = false) {
     if (sh) { cx = sh.cx; cy = sh.cy; r = 2.35; }
     else if (s.type === 'station') { cx = 28; cy = 23; r = 6.6; }
     else if (s.type === 'vault') { cx = 44; cy = 14.6; r = 5.2; }
-    else if (s.type === 'bitmine') { cx = 34.5; cy = 16; r = 2.3; }
     else { cx = 43.1; cy = 22.8; r = 3.9; }
     ring.position.set(cx, 0.08, cy); ring.scale.setScalar(r);
   }
@@ -754,9 +711,6 @@ function applyTown(j) {
   if (j.l1) Object.assign(D.l1, j.l1);
   if (j.price) D.price = j.price;
   if (j.names) Object.assign(D.names, j.names);
-  D.bitmine.stakeShare = D.bitmine.staked / D.staking.staked;
-  D.bitmine.supplyShare = D.bitmine.holdings / D.supply.supply;
-  ST.bitmineRate = (D.bitmine.staked * (D.staking.apr / 100)) / (365 * 86400);
   ST.supply0 = D.supply.supply; ST.issuePerSlot = D.supply.issuedPerDay / 7200;
   D.liveAsOf = new Date(j.asOf || Date.now()).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }

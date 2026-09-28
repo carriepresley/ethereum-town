@@ -9,9 +9,8 @@ function buildWorld() {
   hill(48.6, 22.2, WX, 27.0, 'W');
   buildStation();
   buildVault();
-  buildBitmine();
+  buildPocketPark();
   buildBurn();
-  buildStakePipe();
   buildGates();
   D.l2.slice(0, 14).forEach((s, i) => buildShop({ ...s, rank: i + 1 }, i));
   // houses: Validator Hill (north) and the east edge
@@ -129,7 +128,7 @@ async function init() {
   setPaused(ST.paused);
   selectStop(0);
   flyTo(STOPS[0].view, true); updateFly(0.1);
-  // shareable views: #night, #dusk, #dawn, #day, #tour, #noui, or an L2 / place key (e.g. #base, #station, #vault, #bitmine, #burn)
+  // shareable views: #night, #dusk, #dawn, #day, #tour, #noui, or an L2 / place key (e.g. #base, #station, #vault, #burn)
   const tokens = (location.hash || '').replace('#', '').toLowerCase().split(/[-.~_]/).filter(Boolean);
   for (const t of tokens) {
     if (SKY_HOUR[t] !== undefined || t === 'cycle') { ST.sky = t; $('#skyLabel').textContent = SKY_LABEL[t]; if (t !== 'cycle') hourShown = SKY_HOUR[t]; }

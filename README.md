@@ -11,8 +11,7 @@ Every train that pulls into Mainnet Station is a real block. The 14 busiest laye
 | Mainnet Station | Ethereum's base layer. One real block every 12 seconds; coach windows light up with its transaction count, and each container is one blob, colored by the L2 that posted it. |
 | L2 shops | The 14 busiest L2s by 7-day activity on L2BEAT. Height grows with the square root of value secured, the crowd with the square root of activity. Colors follow each network's brand (no logos). Stage 1 shops fly a green flag; L2BEAT's "Others" are shown as Not rated. |
 | Trucks and couriers | L2s that post data to Ethereum send trucks with their real batches; those that keep data elsewhere (EigenDA, their own network) send couriers. |
-| Beacon Vault | Staking. The people lined up outside are ETH waiting to be staked (about 20,000 ETH per figure); the short row at the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards. |
-| Bitmine | A public company that holds and stakes ETH. A gold pipe links its tower to the vault, where its staked ETH sits; its estimated share of rewards flows back through it. |
+| Beacon Vault | Staking. The people lined up outside are ETH waiting to be staked (about 20,000 ETH per figure); the short row at the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards, flying to the homes on the hill, which stand in for everyone who stakes. |
 | The Burn | The base fee burned by each block, and a running count of total ETH supply. |
 
 People, cars, courier timing and truck routes are decoration scaled from the data. Numbers in the cards are real and dated; estimates are labeled.
@@ -24,7 +23,6 @@ People, cars, courier timing and truck routes are decoration scaled from the dat
 - Blob attribution: [Blobscan](https://blobscan.com), matched to L2BEAT batch-poster addresses
 - Staking and queues: [validatorqueue.com](https://www.validatorqueue.com/) (beaconcha.in data)
 - Issuance, burn and supply: [ultrasound.money](https://ultrasound.money); stablecoins: [DefiLlama](https://defillama.com/stablecoins/Ethereum)
-- Bitmine holdings and staking: the company's weekly press releases
 
 ## How it works
 
@@ -53,8 +51,6 @@ source/prep.py          how data.js was generated (needs the raw snapshot files,
 python3 source/build.py          # rebuild after editing anything in source/
 node source/devserver.js         # http://localhost:8787
 ```
-
-Bitmine's figures (holdings, staked ETH, release date and link) live in `source/data.js` under `bitmine`; update them when a new weekly release comes out, then rebuild.
 
 ## History
 
