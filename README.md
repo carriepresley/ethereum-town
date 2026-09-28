@@ -1,35 +1,63 @@
 # Ethereum Town
 
-Public city: https://ethereumtown.vercel.app/
+A live 3D miniature of the Ethereum network: **https://ethereum-town.vercel.app**
 
-A live miniature Ethereum town inspired by Token Town. Ethereum Hall is the focal point for reliability and capacity observations, with nine selectable L2 neighborhoods and continuous routes into the hall. Nine selected products and protocols occupy connected storefronts: Circle USDC, Tether USDT, Uniswap, Aave, BlackRock BUIDL, Franklin BENJI, JPM Coin/JPMD, Visa's live settlement pilot, and Lido. Six surrounding sector buildings represent the wider financial world. They are contextual, not claims that entire industries are unconnected or destined for Ethereum.
+Every train that pulls into Mainnet Station is a real block. The 14 busiest layer-2 networks are shops, sized by real usage. Trucks carry their data to the station as blobs, and the Beacon Vault shows the real staking queues. Click any building to see what it is, its latest numbers, and links to the sources behind them.
 
-## What is live
+## Reading the town
 
-- Ethereum health observations every 30 seconds: identity-checked latest and finalized execution blocks, their timestamp gap, gas usage against the actual block limit, execution base fee, blob count and separately observed blob base fee. A validated chain of 16 execution blocks provides recent canonical slot coverage and block-capacity history. Missing history is unavailable, not a perfect score. Every field retains its original timestamp and explicit last-known state on failure.
-- The hall beacon acknowledges observed blocks and uses a documented application attention threshold (head observation above 60 seconds, or head-to-finalized timestamp gap above 25.6 minutes). It is not a consensus audit or overall health score. Provider failures are gray rather than an Ethereum-outage assertion.
+| Place | What it shows |
+| --- | --- |
+| Mainnet Station | Ethereum's base layer. One real block every 12 seconds; coach windows light up with its transaction count, and each container is one blob, colored by the L2 that posted it. |
+| L2 shops | The 14 busiest L2s by 7-day activity on L2BEAT. Height grows with the square root of value secured, the crowd with the square root of activity. Colors follow each network's brand (no logos). Stage 1 shops fly a green flag; L2BEAT's "Others" are shown as Not rated. |
+| Trucks and couriers | L2s that post data to Ethereum send trucks with their real batches; those that keep data elsewhere (EigenDA, their own network) send couriers. |
+| Beacon Vault | Staking. The people lined up outside are ETH waiting to be staked (about 20,000 ETH per figure); the short row at the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards. |
+| Bitmine | A public company that holds and stakes ETH. A gold pipe links its tower to the vault, where its staked ETH sits; its estimated share of rewards flows back through it. |
+| The Burn | The base fee burned by each block, and a running count of total ETH supply. |
 
-- Ethereum-only USDC and USDT `totalSupply` values, checked every minute against issuer-verified token contracts at a shared Ethereum block. Chain ID, decimals, freshness and block-hash consistency are verified. Quantities are tokens, not USD valuation, global circulating supply or transaction volume. Tether's contract supply may include treasury inventory.
-- Ten mainnet block feeds checked every 30 seconds while visible: Ethereum and nine selected L2s. Network lights pulse on new observed blocks.
-- Selected bridge and rollup infrastructure events over a rolling 100-block Ethereum window. Pulses travel along shared network infrastructure, not from institution storefronts. Six L2s have selected infrastructure monitoring; three have selected canonical asset-bridge monitoring.
-- Ethereum.org's reported staking figure, checked every 15 minutes. Its underlying measurement time is not published. Staking lights are symbolic and liquid-staking receipt tokens are not counted twice.
+People, cars, courier timing and truck routes are decoration scaled from the data. Numbers in the cards are real and dated; estimates are labeled.
 
-Product status and routes are editorial, primary-source documented information. They are not inferred from blockchain traffic. Source dates and limitations are in each product card and `docs/financial-city-review.md`. Street people, vehicles, building sizes, and city geometry are illustrative. They do not measure customers, adoption, assets or market share.
+## Data sources
 
-## Development and checks
+- Blocks, gas, base fee and blob counts: a public Ethereum JSON-RPC node (each block links to Etherscan)
+- L2 activity, value secured and stages: [L2BEAT](https://l2beat.com)
+- Blob attribution: [Blobscan](https://blobscan.com), matched to L2BEAT batch-poster addresses
+- Staking and queues: [validatorqueue.com](https://www.validatorqueue.com/) (beaconcha.in data)
+- Issuance, burn and supply: [ultrasound.money](https://ultrasound.money); stablecoins: [DefiLlama](https://defillama.com/stablecoins/Ethereum)
+- Bitmine holdings and staking: the company's weekly press releases
 
-Use Node 24 and Bun. Run `bun install --frozen-lockfile`, then `bun run dev`.
+## How it works
 
-Before release: `bun run typecheck`, `bun test`, `bun audit`, `bun run build`, and `TEST_BUILT_SECURITY=1 bun test tests/*.test.ts`. `bun start` serves the production Node build. Vercel uses TanStack Start + Nitro and deploys the connected GitHub main branch.
+- `index.html` is the whole town: three.js 0.170 from jsDelivr, fonts from Google Fonts, and an embedded snapshot from Sep 28, 2026.
+- `api/pulse.js` returns the latest mainnet blocks and which L2s posted blobs in them (cached at the edge for about 8 seconds).
+- `api/town.js` returns L2 rankings, staking queues, supply, burn and stablecoins (cached for 15 minutes).
+- If the functions are unavailable, the page replays three hours of real blocks from the snapshot.
 
-The site has no visitor login, wallet connection, signing, private keys, transaction submission, accounts, database or analytics. Server handlers are read-only and use fixed provider/contract registries, timeouts, bounded response bodies and short completed-value caches. Secrets and deployment files are excluded from Git.
+No build step, environment variables, accounts, wallets or analytics. Vercel serves the root folder as-is.
 
-## Operational limits
+## Editing
 
-Public RPC providers are best-effort and rate-limited. Failures retain dated last-known values with explicit stale labels. The Node cache is bounded and local to each warm server instance. Higher traffic may require dedicated provider capacity and shared caching. No synthetic institution activity is generated when a feed fails. General latest-block inclusion is not consensus finality. The dedicated health feed separately reports the provider’s finalized Ethereum head; it does not independently verify consensus. Validator participation, operator concentration and complete historical uptime are not measured.
+The page is assembled from the files in `source/`:
 
-`security-review.md` records the engineering review and limitations; it is not a penetration-test certification.
+```
+source/head.html        page shell, styles, About panel
+source/js/*.js          the town (scene, buildings, actors, simulation, cards, main loop)
+source/data.js          embedded snapshot used before live data loads, and for the replay
+source/api_src/*.js     serverless function templates
+source/build.py         rebuilds index.html and api/ at the repo root
+source/devserver.js     local stand-in for Vercel (serves the root and runs api/)
+source/prep.py          how data.js was generated (needs the raw snapshot files, not included)
+```
 
-## Visual implementation
+```
+python3 source/build.py          # rebuild after editing anything in source/
+node source/devserver.js         # http://localhost:8787
+```
 
-The public reference code was inspected to identify its rendering techniques, not copied. This scene uses original procedural geometry with Three.js perspective framing, rounded main facades, contact shadows, bloom and restrained depth of field. Selection centers one place, and a compact card explains its observations. The phone rendering path reduces postprocessing. See `docs/token-town-reference-audit.md` and `docs/ethereum-health-review.md` for the source audit and data semantics.
+Bitmine's figures (holdings, staked ETH, release date and link) live in `source/data.js` under `bitmine`; update them when a new weekly release comes out, then rebuild.
+
+## History
+
+This version replaced an earlier Ethereum Town app (TanStack Start, "Ethereum Hall"). That app is preserved in this repository's history at commit `f5c5b91`.
+
+The idea of a data-sized town was sparked by Ryan Sael's Token Town.

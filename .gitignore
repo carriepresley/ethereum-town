@@ -1,10 +1,5 @@
-node_modules/
-dist/
-.output/
-.nitro/
-.vercel/
-.openai/
-.sites-runtime/
-.env*
-!.env.example
 .DS_Store
+.vercel/
+node_modules/
+__pycache__/
+snapshot/
