@@ -6,7 +6,24 @@ const GAS_LIMIT = 60e6;
 const GENESIS = 1606824023;
 function mkBlock(b) { // replay tuple -> block
   const gasPct = b[3] / 10, baseFee = b[4] / 1e4;
-  return { n: b[0], ts: b[1], tx: b[2], gasPct, baseFee, blobs: b[5], posters: b[6], slot: b[7], burn: (b[3] / 1000) * GAS_LIMIT * baseFee * 1e-9 };
+  return { n: b[0], ts: b[1], tx: b[2], gasPct, baseFee, blobs: b[5], posters: b[6], slot: b[7], burn: (b[3] / 1000) * GAS_LIMIT * baseFee * 1e-9,
+    builder: (D.replay.tags || [])[b[8]] || null, wd: b[9] || null };
+}
+/* block builders sign their blocks in extraData; the same grouping runs in /api/town */
+const BUILDER_RX = [[/titan/, 'titan', 'Titan'], [/buildernet/, 'buildernet', 'BuilderNet'], [/quasar/, 'quasar', 'Quasar'], [/beaver/, 'beaver', 'beaverbuild'], [/rsync/, 'rsync', 'rsync'], [/bloxroute|blxr/, 'bloxroute', 'bloXroute'], [/btcs/, 'btcs', 'BTCS'], [/eureka/, 'eureka', 'Eureka'], [/bobthebuilder/, 'bob', 'bobTheBuilder'], [/bombora/, 'bombora', 'Bombora'], [/ultrasound/, 'ultrasound', 'Ultra Sound']];
+const CLIENT_RX = /^(geth|nethermind|besu|erigon|reth)/;
+function builderKey(tag) {
+  const t = (tag || '').toLowerCase();
+  if (!t) return 'untagged';
+  if (CLIENT_RX.test(t.replace(/[^a-z0-9]/g, ''))) return 'self';
+  for (const [rx, k] of BUILDER_RX) if (rx.test(t)) return k;
+  return 'other';
+}
+function builderName(tag) {
+  const k = builderKey(tag), known = BUILDER_RX.find((x) => x[1] === k);
+  if (known) return known[2];
+  if (k === 'self') { const m = CLIENT_RX.exec(tag.toLowerCase().replace(/[^a-z0-9]/g, '')); return 'the proposer’s own node (' + m[1][0].toUpperCase() + m[1].slice(1) + ')'; }
+  return k === 'untagged' ? 'an untagged builder' : tag;
 }
 const REPLAY = D.replay.blocks.map(mkBlock);
 const AVG_BURN = REPLAY.reduce((s, b) => s + b.burn, 0) / REPLAY.length;
@@ -20,7 +37,7 @@ function blockFor(k) {
   if (ST.mode === 'live' && ST.liveK0 !== null && k >= ST.liveK0) return LIVE.get(k) || null;
   const N = REPLAY.length; return REPLAY[((k % N) + N) % N];
 }
-const DONE = { trucks: new Set(), wait: new Set(), board: new Set(), alight: new Set(), depart: new Set() };
+const DONE = { trucks: new Set(), wait: new Set(), board: new Set(), alight: new Set(), depart: new Set(), build: new Set(), pay: new Set() };
 
 /* ---------- trucks & crates per block ---------- */
 const SHOP_BY_KEY = () => Object.fromEntries(SHOPS.map((s) => [s.key, s]));
@@ -185,6 +202,9 @@ function simTick(dt, T) {
     const tr = TRAINS.find((x) => x.k === k);
     if (T >= 12 * k + 3.2 && T < 12 * k + 9) fireCrates(k, b, T, tr);
     if (T >= 12 * k + 9 && !DONE.depart.has(k)) { DONE.depart.add(k); onDepart(k, b); }
+    const real = ST.mode !== 'live' || b.live;
+    if (T >= 12 * k + 1.4 && !DONE.build.has(k)) { DONE.build.add(k); if (real && T < 12 * k + 6) handoff(b); }
+    if (T >= 12 * k + 3.6 && !DONE.pay.has(k)) { DONE.pay.add(k); if (real && T < 12 * k + 10) payout(b); }
   }
   updateCrates(T);
   const cur = blockFor(kNow) || blockFor(kNow - 1);
@@ -203,15 +223,44 @@ function onDepart(k, b) {
   if (ST.lastEpoch !== null && ep !== ST.lastEpoch) epochPayout(ep); // first block of a new epoch (also when its first slot was missed)
   ST.lastEpoch = ep;
 }
-function epochPayout(ep) {
-  toast([44, 5.4, 14], `Epoch ${fmt(ep)} · staking rewards credited`, 'gold');
-  for (let i = 0; i < 26; i++) sendReward(-R(0, 0.45)); // a burst at the epoch boundary
+function epochPayout(ep) { // rewards are credited to validator balances at each epoch boundary; the vault glows
+  toast([44, 5.4, 14], `Epoch ${fmt(ep)} · attestation rewards credited`, 'gold');
+  ST.vaultGlow = 1;
 }
-/* ---------- staking rewards: gold sparks leave the vault for the stakers ----------
-   The homes on the hill stand in for everyone who stakes. A steady trickle, with a burst at each epoch. */
+/* ---------- the builder of each block hands it to the train ---------- */
+const HANDOFFS = [];
+const _hw = new THREE.Vector3();
+function handoff(b) {
+  const w = workshopFor(b.builder); if (!w) return;
+  w.flash = 1;
+  const p0 = new THREE.Vector3(w.cx, w.h + 0.6, (w.y0 + w.y1) / 2), p2 = new THREE.Vector3(STOP_X - 4.5, 1.35, RAIL_Y);
+  HANDOFFS.push({ curve: new THREE.QuadraticBezierCurve3(p0, new THREE.Vector3((p0.x + p2.x) / 2, 4.6, (p0.z + p2.z) / 2), p2), u: 0 });
+  const sel = STOPS[ST.stop] && STOPS[ST.stop].type;
+  if (sel === 'builders' || sel === 'station') toast([w.cx, w.h + 1.35, (w.y0 + w.y1) / 2], `Block ${fmt(b.n)} built by ${builderName(b.builder)}`, 'blk');
+}
+function updateHandoffs(dt) {
+  for (const w of WORKSHOPS) { w.flash = Math.max(0, w.flash - dt * 0.45); w.beacon.emissiveIntensity = 0.15 + w.flash * 3.2 + ST.nightF * 0.4; }
+  for (let i = HANDOFFS.length - 1; i >= 0; i--) {
+    const h = HANDOFFS[i]; h.u += dt * 0.85;
+    if (h.u >= 1) { HANDOFFS.splice(i, 1); continue; }
+    for (let j = 0; j < 2; j++) { h.curve.getPointAt(clamp(h.u - j * 0.02, 0, 1), _hw); sparkles.emit(_hw.x, _hw.y, _hw.z, 0, 0.02, 0, 0.5, 0.2, 0.05, 0.95, '#f2f6ff', '#7f9bff', 0.2); }
+  }
+}
+/* ---------- staking payouts: every block pays 16 validators their accumulated rewards (the withdrawal sweep).
+   Gold sparks fly from the vault to the homes on the hill, which stand in for everyone who stakes. ---------- */
 const REWARDS = [];
-let rewardT = 0.5;
 const _rw = new THREE.Vector3();
+function payout(b) {
+  const wd = b.wd || [16, 0, 0], n = wd[0] || 0;
+  for (let i = 0; i < n; i++) sendReward(-(i / Math.max(1, n)) * 4.4);
+  const sel = STOPS[ST.stop] && STOPS[ST.stop].type;
+  if (sel === 'vault' && n) toast([44, 4.7, 13.4], `Block ${fmt(b.n)} paid ${n} validators ${wd[1] >= 0.01 ? wd[1].toFixed(2) : wd[1].toFixed(3)} ETH`, 'gold');
+  if (wd[2] > 0) { // a withdrawal of 1 ETH or more, usually stake leaving: someone walks out of the OUT door
+    const p = spawnPerson(46.1, 14.95, 0.35, { color: '#d9b25a' });
+    if (p) walkTo(p, [[46.1, 15.62, 0.35], [46.1, 15.93, 0.24], [46.1, 16.2, 0.13], [46.4, 16.45, 0], [49.05, 16.5, 0], [49.45, 18.1, 0], [51.8, 18.15, 0]], kill);
+    if (sel === 'vault') toast([46.1, 3.2, 15.6], `${wd[2] >= 10 ? Math.round(wd[2]) : wd[2].toFixed(1)} ETH withdrawn`, '');
+  }
+}
 function rewardArc() {
   const east = rand() < 0.25; // a few head for the homes on the east edge
   const p0 = new THREE.Vector3(R(41.5, 46.5), 4.25, R(12.7, 14.3));
@@ -224,8 +273,6 @@ function sendReward(u0 = 0) {
 }
 function updateRewards(dt) {
   if (dt <= 0) return;
-  rewardT -= dt;
-  if (rewardT <= 0) { rewardT = R(0.4, 0.75); sendReward(); }
   for (let i = REWARDS.length - 1; i >= 0; i--) {
     const r = REWARDS[i]; r.u += dt * r.speed;
     if (r.u >= 1) { REWARDS.splice(i, 1); continue; }
@@ -242,6 +289,10 @@ function updateFx(dt, T) {
   furnaceMouth.emissiveIntensity = 0.9 + ST.burnLevel * 0.9 + Math.sin(T * 7) * 0.15;
   furnaceLight.intensity = (3 + ST.burnLevel * 4) * (0.3 + ST.nightF * 0.8);
   updateRewards(dt);
+  updateHandoffs(dt);
+  if (mintCoin) mintCoin.rotation.y += dt * 0.9;
+  ST.vaultGlow = Math.max(0, (ST.vaultGlow || 0) - dt * 0.35);
+  if (vaultDoors) vaultDoors.emissiveIntensity += ST.vaultGlow * 1.6;
   smoke.update(dt); flames.update(dt); sparkles.update(dt);
   if (clockHand) clockHand.rotation.z = -((((T % 12) + 12) % 12) / 12) * Math.PI * 2;
   if (ethGem) { ethGem.rotation.y += dt * 0.6; ethGem.position.y = 7.35 + Math.sin(T * 0.8) * 0.12; }

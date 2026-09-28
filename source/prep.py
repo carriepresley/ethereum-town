@@ -14,11 +14,23 @@ sender_map=L("sender_map.json")
 replay=L("replay_blocks.json")
 vq=L("vq_history.json")
 agg=L("l2beat_activity_max.json")["data"]["chart"]["data"]
+wd=L("replay_wd.json")            # per replay block: extraData, fee recipient, withdrawals (ETH)
+stab=L("llama_stables.json")["peggedAssets"]  # DefiLlama stablecoins, fetched Sep 28, 2026
 
-SHOPS=[("lighter","Lighter","#343A46"),("rise","RISE","#F28C28"),("base","Base","#1A5CFF"),("robinhood","Robinhood Chain","#A8D81B"),
-("fuel","Fuel","#19C37D"),("polygon-pos","Polygon PoS","#8247E5"),("megaeth","MegaETH","#E0457B"),("optimism","OP Mainnet","#FF2A3A"),
-("arbitrum","Arbitrum One","#2BB3F3"),("xlayer","X Layer","#8A93A6"),("celo","Celo","#E9DF3A"),("worldchain","World Chain","#E8E8E8"),
-("unichain","Unichain","#F50DB4"),("ink","Ink","#7132F5")]
+NAME_OVERRIDE={"base":"Base","polygon-pos":"Polygon PoS","optimism":"OP Mainnet","arbitrum":"Arbitrum One","xlayer":"X Layer","worldchain":"World Chain",
+"robinhood":"Robinhood Chain","zksync2":"ZKsync Era","gnosis":"Gnosis Chain","starknet":"Starknet","megaeth":"MegaETH","rise":"RISE","roninnetwork":"Ronin","lyra":"Derive"}
+def rows(k):
+    r=acts.get(k) or []
+    return [[x[0], x[1] or 0, x[2] or 0] for x in r]
+def tvs_ex(p): b=p["tvs"]["breakdown"]; return b["total"]-(b.get("associated") or 0)
+# the district: the 14 L2s with the best average of their activity rank and value-secured rank on L2BEAT
+elig={k:p for k,p in summary.items() if p.get("hostChain")=="Ethereum" and p["type"]=="layer2" and not p.get("isArchived")}
+rv={k:i+1 for i,k in enumerate(sorted(elig, key=lambda k:-tvs_ex(elig[k])))}
+act7={k:sum(x[2] for x in rows(k)[-7:])/7/86400 for k in elig if len(rows(k))>=14}
+ru={k:i+1 for i,k in enumerate(sorted(act7, key=lambda k:-act7[k]))}
+district=sorted(act7, key=lambda k:((ru[k]+rv[k])/2, ru[k]))[:14]
+SHOPS=[(k, NAME_OVERRIDE.get(k, summary[k]["name"]), "") for k in district]
+print("district", [(k, ru[k], rv[k]) for k in district])
 # blobscan rollup name -> key
 BS={"base":"base","arbitrum":"arbitrum","world":"worldchain","optimism":"optimism","unichain":"unichain"}
 for addr,keys in sender_map.items():
@@ -27,7 +39,8 @@ for addr,keys in sender_map.items():
 NICE={"soneium":"Soneium","katana":"Katana","metal":"Metal L2","hemi":"Hemi","blast":"Blast","mantle":"Mantle","starknet":"Starknet","taiko":"Taiko",
 "shape":"Shape","codex":"Codex","morph":"Morph","pegglecoin":"Pegglecoin","mode":"Mode","metis":"Metis","boba":"Boba","zora":"Zora","superseed":"Superseed",
 "bob":"BOB","phala":"Phala","linea":"Linea","scroll":"Scroll","settlus":"Settlus","debankchain":"DeBank Chain","r0ar":"r0ar","abstract":"Abstract",
-"hashkey":"HashKey Chain","zksync":"ZKsync Era","zircuit":"Zircuit","forknet":"Forknet","lighter":"Lighter","robinhood":"Robinhood Chain","xlayer":"X Layer","ink":"Ink"}
+"hashkey":"HashKey Chain","zksync":"ZKsync Era","zircuit":"Zircuit","forknet":"Forknet","lighter":"Lighter","robinhood":"Robinhood Chain","xlayer":"X Layer","ink":"Ink",
+"worldchain":"World Chain","fuel":"Fuel","gnosis":"Gnosis Chain","celo":"Celo","megaeth":"MegaETH","rise":"RISE","unichain":"Unichain"}
 shopkeys={k for k,_,_ in SHOPS}
 def key_of(ro, frm):
     if ro: 
@@ -35,6 +48,36 @@ def key_of(ro, frm):
         return k
     k=BS.get("addr:"+frm.lower())
     return k if k else "other"
+
+# ---- block builders (self-reported extraData tags) and validator withdrawals, per replay block
+import re
+BUILDERS=[(r"titan","titan","Titan"),(r"buildernet","buildernet","BuilderNet"),(r"quasar","quasar","Quasar"),(r"beaver","beaver","beaverbuild"),
+ (r"rsync","rsync","rsync"),(r"bloxroute|blxr","bloxroute","bloXroute"),(r"btcs","btcs","BTCS"),(r"eureka","eureka","Eureka"),
+ (r"bobthebuilder","bob","bobTheBuilder"),(r"bombora","bombora","Bombora"),(r"ultrasound","ultrasound","Ultra Sound")]
+def tag_of(h):
+    if not h: return ""
+    return "".join(chr(int(h[i:i+2],16)) for i in range(2,len(h)-1,2) if 32<=int(h[i:i+2],16)<127).strip()
+def builder_key(tag):
+    t=tag.lower()
+    if not t: return "untagged"
+    if re.match(r"^(geth|nethermind|besu|erigon|reth)", re.sub(r"[^a-z0-9]","",t)): return "self"
+    for rx,k,_ in BUILDERS:
+        if re.search(rx,t): return k
+    return "other"
+from collections import Counter
+bcount=Counter(); wd_rows={}
+for b in replay:
+    w=wd[str(b["n"])]
+    bk=builder_key(tag_of(w["extra"])); bcount[bk]+=1
+    skim=[a for a in w["wd"] if a<1]; big=[a for a in w["wd"] if a>=1]
+    wd_rows[b["n"]]=(bk,[len(skim),round(sum(skim),4),round(sum(big),3)])
+bnames=dict((k,n) for _,k,n in BUILDERS); bnames.update({"self":"Built by validators","untagged":"No tag","other":"Other builders"})
+builders={"window":"%s–%s UTC"%(datetime.datetime.utcfromtimestamp(replay[0]["ts"]).strftime("%H:%M"),datetime.datetime.utcfromtimestamp(replay[-1]["ts"]).strftime("%H:%M")),
+  "blocks":len(replay),"shares":[[k,bnames.get(k,k),c] for k,c in bcount.most_common()]}
+skims=[r[1][1] for r in wd_rows.values()]
+payouts={"skimPerBlock":round(statistics.mean(skims),4),"skimPerDay":round(statistics.mean(skims)*7200),"perBlock":16,
+  "principalBlocks":sum(1 for r in wd_rows.values() if r[1][2]>0),"principalEth":round(sum(r[1][2] for r in wd_rows.values()),1),"median":round(statistics.median([a for w in wd.values() for a in w["wd"] if a<1]),4)}
+print("builders", builders["shares"][:8], "payouts", payouts)
 
 # ---- blob shares: prefer 7d
 bfile="blob_txs_7d.json" if os.path.exists(S+"blob_txs_7d.json") else "blob_txs_1d.json"
@@ -50,7 +93,7 @@ print("blob source", bfile, "total/day", round(tot/days)); print(blobShares[:14]
 b1=L("blob_txs_1d.json")
 byblock=defaultdict(lambda: defaultdict(int))
 for bn,ts,ro,cat,nb,fr in b1: byblock[bn][key_of(ro,fr)]+=nb
-blocks=[]; mism=0
+blocks=[]; mism=0; TAGS=[]
 genesis=1606824023
 for b in replay:
     posters=byblock.get(b["n"],{})
@@ -60,13 +103,12 @@ for b in replay:
     if s>b["blobs"]: mism+=1
     pl=sorted(([k,v] for k,v in posters.items() if v>0), key=lambda x:-x[1])
     slot=(b["ts"]-genesis)//12
-    blocks.append([b["n"], b["ts"], b["tx"], round(b["gu"]/b["gl"]*1000), round(b["bf"]/1e9*1e4), b["blobs"], pl, slot])
+    tg=tag_of(wd[str(b["n"])]["extra"])[:40]
+    if tg not in TAGS: TAGS.append(tg)
+    blocks.append([b["n"], b["ts"], b["tx"], round(b["gu"]/b["gl"]*1000), round(b["bf"]/1e9*1e4), b["blobs"], pl, slot, TAGS.index(tg), wd_rows[b["n"]][1]])
 print("replay blocks", len(blocks), "poster mismatches", mism)
 
 # ---- L2 shops
-def rows(k):
-    r=acts.get(k) or []
-    return [[x[0], x[1] or 0, x[2] or 0] for x in r]
 shops=[]
 for k,name,color in SHOPS:
     r=rows(k); p=summary[k]
@@ -82,10 +124,10 @@ for k,name,color in SHOPS:
       "ownToken":"/".join(t["symbol"] for t in (p["tvs"].get("associatedTokens") or [])[:2]),"tvs7d":round(p["tvs"].get("change7d") or 0,4),
       "stage":p["stage"],"category":p["category"],"stack":", ".join(p.get("providers") or []) or "Independent",
       "da":damode,"daLabel":risks.get("Data Availability",""),"blobsPerDay":round(per.get(dict(worldchain="worldchain").get(k,k),0)/days),
-      "blobShare":round(per.get(k,0)/tot,4),"txPerDay":round(sum(x[1] for x in r[-7:])/7),"spark":spark,"sparkRange":[d0,d1]})
-shops.sort(key=lambda s:-s["uops"])
-for i,s in enumerate(shops): s["rank"]=i+1
-print([(s["rank"],s["name"],s["uops"],s["blobsPerDay"],s["da"],s["stage"]) for s in shops])
+      "blobShare":round(per.get(k,0)/tot,4),"txPerDay":round(sum(x[1] for x in r[-7:])/7),"spark":spark,"sparkRange":[d0,d1],
+      "ru":ru[k],"rv":rv[k],"risks":[[x["name"],x["value"],x.get("sentiment") or "",(x.get("regular") or {}).get("value")] for x in p["risks"]]})
+for i,s in enumerate(shops): s["rank"]=i+1   # district order: best combined rank nearest the station
+print([(s["rank"],s["name"],s["uops"],s["ru"],s["rv"],s["blobsPerDay"],s["da"],s["stage"]) for s in shops])
 
 # ---- staking history (90d)
 hist=[[r["date"][5:], r["entry_queue"], r["exit_queue"]] for r in vq[-90:]]
@@ -93,8 +135,21 @@ last=vq[-1]
 # ---- L2 aggregate
 def avg7(i): return sum((x[2] or 0) for x in agg[i-6:i+1])/7/86400
 n=len(agg)
-l2agg={"uops":round(avg7(n-1)),"uopsYearAgo":round(avg7(n-366)),"lighterShare":round(shops[0]["uops"]/avg7(n-1),3),
+lighter=next(s for s in shops if s["key"]=="lighter")
+l2agg={"uops":round(avg7(n-1)),"uopsYearAgo":round(avg7(n-366)),"lighterShare":round(lighter["uops"]/avg7(n-1),3),"lighterUops":lighter["uops"],"nL2":len(act7),
        "lighterSince":"Oct 2, 2025"}  # L2BEAT only counts Lighter from this date, so the year-ago figure has no Lighter in it
+# ---- stablecoins on Ethereum (USD-pegged), DefiLlama
+def eth_usd(a): return (((a.get("chainCirculating") or {}).get("Ethereum") or {}).get("current") or {}).get("peggedUSD",0) or 0
+st_all=sum(((a.get("circulating") or {}).get("peggedUSD",0) or 0) for a in stab)
+st_eth=sum(eth_usd(a) for a in stab)
+top=sorted(stab, key=lambda a:-eth_usd(a))[:5]
+st_top=[[a["symbol"],a["name"],round(eth_usd(a)),a.get("pegMechanism") or ""] for a in top]
+shist=L("llama_stables_eth.json")   # daily totals on Ethereum, for the year-on-year change
+def hv(r): v=r.get("totalCirculatingUSD") or r.get("totalCirculating") or {}; return v.get("peggedUSD",0)
+last_ts=int(shist[-1]["date"]); yr=[r for r in shist if abs(int(r["date"])-(last_ts-365*86400))<=86400]
+eth_yoy=round(hv(shist[-1])/hv(yr[0])-1,4) if yr else None
+print("stables eth", round(st_eth/1e9,2), "all", round(st_all/1e9,2), "top", [(x[0], round(x[2]/1e9,2)) for x in st_top], "yoy", eth_yoy)
+
 # ---- replay tx sparkline (5-min buckets)
 bucket=25; txs=[b[2] for b in blocks]
 rspark=[round(statistics.mean(txs[i:i+bucket]),1) for i in range(0,len(txs),bucket)]
@@ -104,7 +159,7 @@ DATA={
  "l1":{"txPerDay":1870288,"txPerDayYearAgo":1552983,"gasLimit":60000000,"gasLimitYearAgo":45000000,"fullness":0.506,"baseFee7d":0.495,
        # blob week (Sep 21-27, Blobscan daily totals): 251,419 blobs = ~35.9K/day = ~5.0 per block; fees 0.99 ETH
        "blobsPerBlock":5.0,"blobTarget":14,"blobMax":21,"blobFees7dEth":0.99,"blobsPerDay":35917,"blobSourceDays":days,"window":"7d"},
- "replay":{"blocks":blocks,"spark":rspark,"bucket":bucket,
+ "replay":{"blocks":blocks,"tags":TAGS,"spark":rspark,"bucket":bucket,
            "from":datetime.datetime.utcfromtimestamp(replay[0]["ts"]).strftime("%H:%M"),"to":datetime.datetime.utcfromtimestamp(replay[-1]["ts"]).strftime("%H:%M")},
  "names":{**NICE, **{k:n for k,n,_ in SHOPS}, "other":"Unlabeled rollups"},
  "blobShares":blobShares[:16],
@@ -115,7 +170,8 @@ DATA={
             # fact-check on Sep 28: ~99% of the exit line was EIP-7251 consolidations (ETH stays staked); ~1.9K ETH was really leaving
             "exitNote":{"date":"Sep 28, 2026","expires":"2026-09-30T12:00:00Z","consolidationShare":0.99,"unstakingEth":1900}},
  "l2":shops,"l2agg":l2agg,
- "stables":{"eth":148.4e9,"all":313.1e9,"share":0.474,"ethYoY":-0.063,"allYoY":0.057},
+ "stables":{"eth":round(st_eth),"all":round(st_all),"share":round(st_eth/st_all,4),"ethYoY":eth_yoy,"top":st_top,"asOf":"Sep 28, 2026"},
+ "builders":builders, "payouts":payouts,
 }
 open("data.js","w").write("window.ETH_TOWN_DATA="+json.dumps(DATA,separators=(",",":"))+";\n")
 print("data.js bytes", os.path.getsize("data.js"), "l2agg", l2agg)

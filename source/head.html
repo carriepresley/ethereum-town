@@ -158,6 +158,16 @@ details.more[open] > summary{margin-bottom:2px}
 .maplist i{width:10px;height:10px;border-radius:3px;margin-top:4px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.18)}
 .maplist b{color:var(--ink);font-weight:700}
 .srcs{padding-bottom:2px}
+.risks{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.risks li{display:grid;grid-template-columns:18px auto 1fr;gap:8px;align-items:center;font-size:12.5px;line-height:1.35}
+.risks .ri{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;color:#fff}
+.risks .r-good .ri{background:#23975a}.risks .r-warning .ri{background:#b87d0e}.risks .r-bad .ri{background:#d23c3c}.risks .r-none .ri{background:var(--ink-3)}
+.risks .rn{color:var(--ink-2);font-weight:600;white-space:nowrap}
+.risks .rv{color:var(--ink);font-weight:650;text-align:right;text-wrap:balance}
+.risks .rv small{display:block;color:var(--ink-3);font-weight:600;font-size:11px}
+.risks + details.more{margin-top:10px}
+button.linkish{border:0;background:none;padding:0;font:inherit;color:inherit;text-align:left;text-decoration:underline dotted;text-underline-offset:3px;cursor:pointer}
+button.linkish:hover{color:var(--ink)}
 .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px}
 .mini div{background:var(--chip);border-radius:10px;padding:8px 9px}
 .mini span{display:block;font-size:10.5px;color:var(--ink-3);font-weight:700;line-height:1.2}
@@ -208,6 +218,13 @@ details.more[open] > summary{margin-bottom:2px}
 .tip{position:absolute;z-index:30;pointer-events:none;background:var(--panel-solid);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:12px;box-shadow:var(--shadow);white-space:nowrap;font-variant-numeric:tabular-nums}
 .tip b{font-weight:700}
 .showui{position:absolute;right:16px;bottom:calc(14px + env(safe-area-inset-bottom,0px));z-index:5}
+.caption{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(86px + env(safe-area-inset-bottom,0px));width:min(560px,calc(100% - 32px));box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow);padding:14px 16px 12px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:grid;gap:10px;z-index:3}
+.caption p{margin:0;font:700 17px/1.35 var(--ui);color:var(--ink);text-wrap:balance;min-height:2.7em}
+.caption .cap-r{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.caption .dots{display:flex;gap:6px}
+.caption .dots i{width:7px;height:7px;border-radius:50%;background:var(--line)}
+.caption .dots i.on{background:var(--accent)}
+body.intro .card,body.intro .key{display:none}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* ---------- responsive ---------- */
@@ -220,11 +237,16 @@ details.more[open] > summary{margin-bottom:2px}
   .plaque p:not(.asof){display:none}
   .plaque .asof{margin-top:3px;font-size:11px}
   .board{display:none}
-  .card{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));left:16px;right:16px;width:auto;max-height:50%;padding:11px 14px}
-  .card.collapsed{max-height:none}
-  .card.collapsed > *:not(.card-head){display:none}
-  .card.collapsed .card-head .sub{display:none}
-  .card.collapsed .card-head h2::after{content:"Tap for details";display:block;font:600 11px/1.4 var(--ui);letter-spacing:.02em;text-transform:none;color:var(--ink-3);margin-top:3px}
+  .card{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));left:16px;right:16px;width:auto;max-height:none;height:96px;padding:0;display:flex;flex-direction:column;overflow:hidden;overscroll-behavior:contain}
+  .card .grab{flex:none;height:20px;display:grid;place-items:center;cursor:grab;touch-action:none}
+  .card .grab i{width:38px;height:4px;border-radius:2px;background:var(--ink-3);opacity:.45}
+  .card .sheet-body{flex:1;min-height:0;overflow:auto;padding:0 14px 12px;overscroll-behavior:contain}
+  .card[data-sheet="peek"] .sheet-body{overflow:hidden}
+  .card[data-sheet="peek"] .card-head{touch-action:none}
+  .card[data-sheet="peek"] .card-head .sub{display:none}
+  .card[data-sheet="peek"] .card-head h2::after{content:"Swipe up or tap for details";display:block;font:600 11px/1.4 var(--ui);letter-spacing:.02em;text-transform:none;color:var(--ink-3);margin-top:3px}
+  .caption{bottom:auto;top:calc(78px + env(safe-area-inset-top,0px))}
+  .caption p{font-size:15px}
   .card h2{font-size:24px}
   .dock{left:16px;right:16px;transform:none;border-radius:18px;flex-direction:column;align-items:stretch;gap:6px;padding:6px}
   .dock .sep{display:none}
@@ -243,7 +265,7 @@ details.more[open] > summary{margin-bottom:2px}
 .labels[hidden],.toasts[hidden]{display:none}
 .lbl{position:absolute;left:0;top:0;pointer-events:auto;display:inline-flex;align-items:center;gap:5px;border:0;border-radius:999px;padding:3px 9px 3px 5px;font:600 11.5px/1.2 var(--ui);color:#10141f;background:rgba(255,255,255,.9);box-shadow:0 4px 14px rgba(8,12,24,.22),0 0 0 1px rgba(8,12,24,.08);white-space:nowrap;cursor:pointer;will-change:transform;transition:background .2s,color .2s}
 .lbl i{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:inset 0 0 0 1px rgba(0,0,0,.25)}
-.lbl i.station{background:#4453d0}.lbl i.vault{background:#bcd0ff}.lbl i.burn{background:#ff7a3d}
+.lbl i.station{background:#4453d0}.lbl i.vault{background:#bcd0ff}.lbl i.burn{background:#ff7a3d}.lbl i.mint{background:#d4a537}.lbl i.builders{background:#b5533c}
 .lbl b{font-weight:800;font-size:10px;color:#6b7289;margin-right:1px}
 .lbl.on{background:#10141f;color:#fff;font-size:12.5px;padding:5px 11px 5px 7px;z-index:2}
 .lbl.on b{color:#aab2ff}
@@ -307,6 +329,7 @@ body.ready .loading{opacity:0;pointer-events:none}
     </section>
 
     <aside class="card" id="card" aria-label="About this place"></aside>
+    <div class="caption" id="caption" hidden role="status" aria-live="polite"><p id="capText"></p><div class="cap-r"><span class="dots" id="capDots" aria-hidden="true"></span><button class="btn" id="capSkip" type="button">Skip intro</button></div></div>
 
     <aside class="key" id="key" aria-label="How to read the town">
       <h4>How to read it <button id="keyToggle" aria-expanded="true">Hide</button></h4>
@@ -316,8 +339,9 @@ body.ready .loading{opacity:0;pointer-events:none}
         <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="6" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="10" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6 10 10 4h5l1 6" fill="none" stroke="currentColor" stroke-width="1.6"/></svg><span><b>Courier</b> = data kept off Ethereum</span></li>
         <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="5" cy="5" r="2.2" fill="currentColor"/><circle cx="11" cy="4" r="2.2" fill="currentColor"/><circle cx="17" cy="5" r="2.2" fill="currentColor"/><rect x="3" y="8" width="4" height="5" rx="2" fill="currentColor"/><rect x="9" y="7" width="4" height="6" rx="2" fill="currentColor"/><rect x="15" y="8" width="4" height="5" rx="2" fill="currentColor"/></svg><span><b>Crowd</b> grows with L2 activity</span></li>
         <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M6 13V2" stroke="currentColor" stroke-width="1.6"/><path d="M6.8 2.5h9l-2.2 2.5 2.2 2.5h-9z" fill="#2fb36b"/></svg><span><b>Green flag</b> = Stage 1 on L2BEAT</span></li>
+        <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><path d="M11 7V1a6 6 0 0 1 5.7 4.1z" fill="#2fb36b"/><path d="M11 7l5.7-1.9a6 6 0 0 1-2.2 6.8z" fill="#f0b43a"/><path d="M11 7l3.5 4.9a6 6 0 0 1-7 0z" fill="#e5484d"/><path d="M11 7l-3.5 4.9a6 6 0 0 1-2.2-6.8z" fill="#2fb36b"/><path d="M11 7 5.3 5.1A6 6 0 0 1 11 1z" fill="#e5484d"/></svg><span><b>Rosette</b> = L2BEAT risk summary</span></li>
         <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="4" cy="5" r="2" fill="#2e4a7d"/><circle cx="9.5" cy="5" r="2" fill="#4d7ea8"/><circle cx="15" cy="5" r="2" fill="#1f7a6d"/><path d="M1 10.5h20" stroke="#3d5fc4" stroke-width="1.6"/></svg><span><b>Line at the vault</b> = ETH waiting to stake</span></li>
-        <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="4" cy="10" r="1.6" fill="#f1c465"/><circle cx="9" cy="6.5" r="2" fill="#f1c465"/><circle cx="15" cy="4" r="2.4" fill="#ffb83d"/></svg><span><b>Gold sparks</b> = staking rewards</span></li>
+        <li><svg width="22" height="14" viewBox="0 0 22 14" aria-hidden="true"><circle cx="4" cy="10" r="1.6" fill="#f1c465"/><circle cx="9" cy="6.5" r="2" fill="#f1c465"/><circle cx="15" cy="4" r="2.4" fill="#ffb83d"/></svg><span><b>Gold sparks</b> = reward payouts</span></li>
       </ul>
     </aside>
 
@@ -352,25 +376,29 @@ body.ready .loading{opacity:0;pointer-events:none}
       <h3>How to read it</h3>
       <table>
         <tr><td>Block train</td><td>One real block every 12 seconds. Coach windows light up with the block's transaction count. Each container on the flatcars is one blob, colored by the L2 that posted it.</td></tr>
-        <tr><td>L2 shops</td><td>The 14 busiest L2s by 7-day activity on L2BEAT. The busiest gets the lot closest to the station. Building height grows with the square root of value secured (not counting the chain's own token, such as ARB or OP), and the crowd at the door with the square root of activity. Colors follow each network's brand; there are no logos.</td></tr>
+        <tr><td>L2 shops</td><td>The 14 L2s with the best average of their activity rank and value-secured rank on L2BEAT (7-day averages); the best gets the lot closest to the station. The rosette on each roof is L2BEAT's five-part risk summary: green is good, amber a caution, red a risk. Building height grows with the square root of value secured (not counting the chain's own token, such as ARB or OP), and the crowd at the door with the square root of activity. Colors follow each network's brand; there are no logos.</td></tr>
+        <tr><td>Builders' Row</td><td>Across the tracks, the block builders, sized by their share of recent blocks as tagged in each block. The workshop that built the arriving block lights up and sends it over. Self-built blocks come from the proposing validator's own node.</td></tr>
         <tr><td>Blob trucks</td><td>One truck for each L2 that posted blobs in that block, leaving from its shop. Batches from L2s outside the top 14, or from unlabeled posters, arrive from out of town.</td></tr>
         <tr><td>Couriers</td><td>L2s that publish their data somewhere other than Ethereum (EigenDA, or their own network) send small couriers instead of trucks. Their timing is illustrative.</td></tr>
-        <tr><td>Beacon Vault</td><td>Staking. The people lined up outside are ETH waiting to be staked, about 20,000 ETH per figure; the line's length is the real entry queue, and the front walks in through the IN door at a sped-up pace. The short row by the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards, with a burst every epoch; they fly to the homes on the hill, which stand in for everyone who stakes.</td></tr>
+        <tr><td>Beacon Vault</td><td>Staking. The people lined up outside are ETH waiting to be staked, about 20,000 ETH per figure; the line's length is the real entry queue, and the front walks in through the IN door at a sped-up pace. The short row by the OUT door is the exit queue. Gold sparks are real reward payouts: each block carries up to 16 withdrawals, and the sparks fly to the homes on the hill, which stand in for everyone who stakes. A figure leaving through the OUT door marks a withdrawal of 1 ETH or more, usually stake leaving, and the vault glows when an epoch's attestation rewards are credited.</td></tr>
         <tr><td>The Burn</td><td>Flares with the base fee burned by each block. The supply counter adds new issuance every slot and subtracts each block's burn.</td></tr>
+        <tr><td>The Mint</td><td>Stablecoins on Ethereum mainnet. The coin stacks are the five largest dollar stablecoins plus everything else, sized by supply.</td></tr>
       </table>
       <h3>Where the numbers come from</h3>
       <ul>
         <li>Blocks, gas, base fee and blob counts: a public Ethereum node (JSON-RPC). The replay uses blocks 26,074,816 to 26,075,715, and the station card links each block to <a href="https://etherscan.io" target="_blank" rel="noopener">Etherscan</a> so you can check it.</li>
         <li>L2 activity (user operations per second), value secured and stages: <a href="https://l2beat.com/layer2s/activity" target="_blank" rel="noopener">L2BEAT</a>, 7-day averages. Value secured leaves out each chain's own token. Projects L2BEAT lists under “Others” are shown as Not rated.</li>
         <li>Blob attribution by L2: <a href="https://blobscan.com" target="_blank" rel="noopener">Blobscan</a>, matched to L2BEAT batch-poster addresses where unlabeled.</li>
+        <li>Block builders and validator payouts: each block's extra-data tag and withdrawals, read from the same public node. Tags are self-reported.</li>
         <li>Staking and queues: <a href="https://www.validatorqueue.com/" target="_blank" rel="noopener">validatorqueue.com</a> (beaconcha.in data).</li>
-        <li>Issuance, burn and supply: <a href="https://ultrasound.money" target="_blank" rel="noopener">ultrasound.money</a>. Stablecoins: <a href="https://defillama.com/stablecoins/Ethereum" target="_blank" rel="noopener">DefiLlama</a>.</li>
+        <li>Issuance, burn and supply: <a href="https://ultrasound.money" target="_blank" rel="noopener">ultrasound.money</a>. Stablecoins and their issuers: <a href="https://defillama.com/stablecoins/Ethereum" target="_blank" rel="noopener">DefiLlama</a>.</li>
         <li>The figures and explainers were checked against these sources on Sep 28, 2026.</li>
       </ul>
       <h3>What's illustrative</h3>
       <p>People, cars, courier timing and the exact truck routes are decoration scaled from the data. Numbers in the cards are real and dated, and estimates are labeled as estimates. Nothing here is investment advice.</p>
       <h3>Keys</h3>
       <p><kbd>←</kbd> <kbd>→</kbd> stops · <kbd>Space</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed · <kbd>N</kbd> time of day · <kbd>T</kbd> tour · <kbd>H</kbd> hide interface. Drag to pan, right-drag or two fingers to rotate, scroll or pinch to zoom, and click any building for its card. Every place has its own link (for example <a href="https://ethereum-town.vercel.app/#base" target="_blank" rel="noopener">#base</a> or #vault); use Share in any card to copy it.</p>
+      <p><button class="btn" id="introBtn" type="button">Watch the 30-second intro</button></p>
       <p style="margin-top:14px;font-size:12px;color:var(--ink-3)">The idea of a data-sized town was sparked by Ryan Sael's Token Town.</p>
     </div>
   </div>

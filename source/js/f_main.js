@@ -9,7 +9,8 @@ function buildWorld() {
   hill(48.6, 22.2, WX, 27.0, 'W');
   buildStation();
   buildVault();
-  buildPocketPark();
+  buildMint();
+  buildBuilders();
   buildBurn();
   buildGates();
   D.l2.slice(0, 14).forEach((s, i) => buildShop({ ...s, rank: i + 1 }, i));
@@ -19,7 +20,7 @@ function buildWorld() {
   for (let x = 40.2; x < 50.6; x += R(3.0, 3.6)) { house(x, R(0.7, 1.1), R(1.9, 2.3), R(1.7, 2.0), seed++); addTree(x + R(2.2, 2.7), R(1.4, 3.2), R(0.8, 1.1)); }
   house(49.4, 8.2, 2.0, 1.8, seed++); house(49.6, 11.2, 1.9, 1.8, seed++);
   // trees
-  for (let x = 0.7; x < WX - 0.5; x += R(1.3, 2.1)) if (x < 36.4 || x > 39.6) addTree(x, R(29.7, 30.7), R(0.85, 1.25));
+  for (let x = 0.7; x < WX - 0.5; x += R(1.3, 2.1)) if ((x < 36.4 || x > 39.6) && (x < 19.1 || x > 36.1)) addTree(x, R(29.7, 30.7), R(0.85, 1.25)); // Builders' Row sits across the tracks
   for (let x = 4.5; x < 47.5; x += R(3.5, 5.5)) if (x < 36 || x > 40) addTree(x, R(26.35, 26.8), R(0.6, 0.85), 'round');
   for (let x = 1.2; x < 36; x += R(3.6, 4.6)) if (!(x > 12 && x < 15) && !(x > 26 && x < 29)) addTree(x, 13.85, R(0.62, 0.78), 'round');
   for (let x = 1.4; x < WX - 1; x += R(4.2, 5.6)) if (!(x > 12 && x < 15) && !(x > 26 && x < 29) && !(x > 36.5 && x < 39.5)) addTree(x, 6.85, R(0.62, 0.8), 'round');
@@ -40,7 +41,7 @@ function buildWorld() {
 
 let lastFrame = performance.now(), flagT = 0, screenT = 0;
 const NORENDER = /norender/.test(location.hash);
-window.__town = { ST, D, people, vehicles, TRAINS, crates, LIVE, SHOPS, VAULTQ, REWARDS, LOW, MSAA, get board() { return boardBlock; }, get pr() { return renderer.getPixelRatio(); }, flyTo: (v) => { flyTo(v, true); updateFly(0.1); } };
+window.__town = { ST, D, STOPS, people, vehicles, TRAINS, crates, LIVE, SHOPS, VAULTQ, REWARDS, WORKSHOPS, HANDOFFS, MINT, LOW, MSAA, get board() { return boardBlock; }, get pr() { return renderer.getPixelRatio(); }, flyTo: (v) => { flyTo(v, true); updateFly(0.1); } };
 /* one-step quality drop when the first seconds run slowly: fewer pixels, no MSAA, no shadows from people and cars */
 const PERF = { t: 0, n: 0, sum: 0, done: false };
 function watchPerf(raw) {
@@ -106,6 +107,7 @@ function frame(now) {
   if (ring.visible) { ring.userData.t = (ring.userData.t || 0) + dtR; ring.material.opacity = 0.55 * (1 - smooth((ring.userData.t - 2.2) / 1.6)); ring.scale.z = 1; }
   // tour
   if (ST.tour) { ST.tourT += dtR; if (ST.tourT > 9) { ST.tourT = 0; selectStop(ST.stop + 1, true); } }
+  updateIntro(dtR);
   screenT += dtR; if (screenT > 0.12) { screenT = 0; updateSupply(); }
   updateLabels(); updateToasts(dtR);
   if (!NORENDER) composer.render();
@@ -160,6 +162,7 @@ async function init() {
   selectStop(0);
   flyTo(STOPS[0].view, true); updateFly(0.1);
   applyHash(tokens, true);
+  if (!tokens.length && !RM && !NORENDER && !introSeen()) setTimeout(() => { if (ST.stop === 0 && !ST.tour) startIntro(); }, 1200); // first visit: a short guided flight
   // a link pasted into the address bar of an open town (our own replaceState calls don't fire this)
   window.addEventListener('hashchange', () => {
     const t = (location.hash || '').replace('#', '').toLowerCase().split(/[-.~_]/).filter(Boolean);

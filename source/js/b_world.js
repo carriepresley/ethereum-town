@@ -42,6 +42,8 @@ const BRAND = {
   worldchain: { id: '#e6e6e6', wall: '#fafafa', trim: '#121212', accent: '#121212', sign: ['#121212', '#ffffff'] },
   unichain: { id: '#f50db4', wall: '#f21bb6', trim: '#ffe8f7', accent: '#ffffff', sign: ['#ffffff', '#cc0096'] },
   ink: { id: '#7132f5', wall: '#7438f3', trim: '#efe8ff', accent: '#ffffff', sign: ['#ffffff', '#5a1fe0'] },
+  starknet: { id: '#ec796b', wall: '#1b1b5e', trim: '#ec796b', accent: '#ec796b', sign: ['#ec796b', '#0c0c4f'] },
+  gnosis: { id: '#3e8e6a', wall: '#f0ebde', trim: '#133629', accent: '#133629', sign: ['#133629', '#f0ebde'] },
 };
 const FALLBACK_ACCENTS = ['#ff8a3d', '#27b5a3', '#d64f8c', '#6c7bff', '#e0b02a', '#45a0e6', '#9b6bd6'];
 function brandOf(key, i) {
@@ -53,7 +55,7 @@ function shopColor(key) { return (BRAND[key] && BRAND[key].id) || '#c9ae84'; }
 const CONTAINER = {
   lighter: '#3a404c', rise: '#f28c28', base: '#0052ff', robinhood: '#b8e600', fuel: '#00d98a', 'polygon-pos': '#7b3fe4',
   megaeth: '#e2487f', optimism: '#ff0420', arbitrum: '#12aaff', xlayer: '#9aa3b5', celo: '#f2f24a', worldchain: '#f2f2f2',
-  unichain: '#f50db4', ink: '#7132f5', other: '#c7ad86',
+  unichain: '#f50db4', ink: '#7132f5', starknet: '#ec796b', gnosis: '#3e8e6a', other: '#c7ad86',
 };
 function containerColor(key) { return CONTAINER[key] || '#c7ad86'; }
 /* L2BEAT shows no stage for projects in its "Others" category, even when its data says "Stage 0". */
@@ -281,6 +283,8 @@ function buildShop(s, idx) {
   }
   // antenna for the tallest
   if (tall) cyl(cx, cy, 0.04, h + 0.18, h + 1.6, '#cfd4db', { m: 0.6, r: 0.3 }, 6);
+  // L2BEAT's risk rosette on the roof: five slices, green / amber / red
+  if (s.risks && s.risks.length) rosette(tall ? x0 + 1.95 : x0 + 1.75, tall ? y0 + 1.95 : y1 - 0.95, top + 0.012, tall ? 0.34 : 0.38, s.risks);
   const grp = endGroup();
   const shop = {
     ...s, idx, x0, x1, y0, y1, cx, cy, h, brand: b, flag, grp,
@@ -292,6 +296,26 @@ function buildShop(s, idx) {
   // lamp posts near the shop front
   LAMPS.push({ x: x0 - 0.35, y: y1 + 0.9 });
   return shop;
+}
+
+/* ---------- L2BEAT risk rosette ---------- */
+const RISK_ORDER = ['State Validation', 'Data Availability', 'Exit Window', 'Proposer Failure', 'Sequencer Failure'];
+const RISK_COLOR = { good: '#2fb36b', warning: '#f0b43a', bad: '#e5484d' };
+const riskMats = {};
+function riskMat(sent) {
+  if (!riskMats[sent]) { const c = RISK_COLOR[sent] || '#9aa1ab'; riskMats[sent] = nightMat(new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.12, roughness: 0.6 }), 0.12, 0.75); }
+  return riskMats[sent];
+}
+function rosette(x, y, h, r, risks) {
+  const by = Object.fromEntries(risks.map((q) => [q[0], q[2]]));
+  const base = new THREE.CircleGeometry(r + 0.06, 40); base.rotateX(-Math.PI / 2); base.translate(x, h, y);
+  put(base, '#20242c', { cast: false });
+  RISK_ORDER.forEach((name, i) => {
+    const t0 = Math.PI / 2 - (i + 1) * (Math.PI * 2 / 5) + 0.05; // clockwise from 12 o'clock, seen from above
+    const g = new THREE.CircleGeometry(r, 10, t0, Math.PI * 2 / 5 - 0.1);
+    g.rotateX(-Math.PI / 2); g.translate(x, h + 0.008, y);
+    putM(g, riskMat(by[name] || ''), false, true);
+  });
 }
 
 /* ================= civic buildings ================= */
@@ -370,6 +394,7 @@ function buildVault() {
   signPlane(signTexture('OUT · EXIT', '#4b5263', '#ffffff', { w: 512, h: 150, spacing: 3 }), 'S', 45.95, 15.66, 2.42, 0.96, 0.3, [0.35, 1.0]);
   for (const x of [41.6, 42.3, 45.6, 46.3]) box(x - 0.012, 15.65, x + 0.012, 15.67, 2.57, 2.74, '#6b6f78', { cast: false });
   CIVIC.vault = endGroup();
+  vaultDoors = CIVIC.vault.mats.find((m) => m.emissive && m.emissive.getHexString() === 'bcd0ff') || vaultDoors; // the group's own copy
   // queue stanchions (entry: 4 serpentine rows, blue ropes; exit: 1 row, grey rope)
   const rope = M('#3d5fc4', { r: 0.6 }), ropeOut = M('#8a909c', { r: 0.6 });
   for (let r = 0; r < 4; r++) {
@@ -383,13 +408,111 @@ function buildVault() {
   for (const x of [39.7, 48.3]) LAMPS.push({ x, y: 16.4 });
 }
 
-/* the corner lot next to the vault: a small pocket park */
-function buildPocketPark() {
-  box(33.05, 14.65, 35.95, 17.35, 0.025, 0.05, COLORS.park, { cast: false });
-  box(33.05, 15.85, 35.95, 16.15, 0.05, 0.058, COLORS.paved, { cast: false });
-  for (const [x, y] of [[33.55, 15.1], [35.35, 15.2], [33.7, 16.85], [35.2, 16.9], [34.45, 14.95]]) addTree(x, y, R(0.75, 1.0), 'round');
-  for (const x of [33.9, 35.0]) { box(x - 0.28, 16.22, x + 0.28, 16.34, 0.2, 0.24, '#8a6a4d'); box(x - 0.28, 16.32, x + 0.28, 16.36, 0.24, 0.42, '#8a6a4d', { cast: false }); }
+/* ---------- the Mint: stablecoins on Ethereum. Coin stacks in front are the five biggest, plus everything else ---------- */
+const STABLE_COLORS = { USDT: '#26a17b', USDC: '#2775ca', USDS: '#7b61ff', DAI: '#f5ac37', USDe: '#1f1f22', PYUSD: '#0070e0', USD1: '#c9a227', RLUSD: '#3a86ff', USDY: '#5b7cfa', USDf: '#e0663a', GHO: '#9c89f5' };
+const STABLE_FALLBACK = ['#4fb3a9', '#d9765f', '#8c7ae6', '#e0b64a', '#5aa1e3'];
+function stableColor(sym, i) { return STABLE_COLORS[sym] || STABLE_FALLBACK[i % STABLE_FALLBACK.length]; }
+let mintCoin = null;
+const MINT = { x0: 33.15, x1: 35.85, y0: 14.6, y1: 16.2 };
+let coinTex = null;
+function coinStripes() {
+  if (coinTex) return coinTex;
+  const c = textCanvas(8, 64), g = c.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 8, 64);
+  for (let y = 0; y < 64; y += 8) { g.fillStyle = 'rgba(0,0,0,0.28)'; g.fillRect(0, y, 8, 1.4); g.fillStyle = 'rgba(255,255,255,0.9)'; g.fillRect(0, y + 1.4, 8, 1); }
+  coinTex = new THREE.CanvasTexture(c); coinTex.wrapS = coinTex.wrapT = THREE.RepeatWrapping; coinTex.colorSpace = THREE.SRGBColorSpace;
+  return coinTex;
+}
+function buildMint() {
+  const { x0, x1, y0, y1 } = MINT, cx = (x0 + x1) / 2, h = 1.85;
+  beginGroup('mint');
+  box(x0 - 0.15, y0 - 0.15, x1 + 0.15, 17.35, 0, 0.05, '#e3dccd', { cast: false }); // plaza
+  box(x0 - 0.08, y0 - 0.08, x1 + 0.08, y1 + 0.28, 0.05, 0.2, '#d6ccb8');            // plinth
+  box(cx - 0.75, y1 + 0.28, cx + 0.75, y1 + 0.46, 0.05, 0.12, '#d6ccb8');           // step
+  box(x0, y0, x1, y1 - 0.42, 0.2, h, '#efe6d2', { r: 0.85 });                         // hall
+  for (const x of [x0 + 0.3, x0 + 0.95, x1 - 0.95, x1 - 0.3]) cyl(x, y1 - 0.14, 0.1, 0.2, h - 0.1, '#f7f1e3', { r: 0.6 }, 12);
+  box(cx - 0.28, y1 - 0.45, cx + 0.28, y1 - 0.4, 0.2, 1.25, '#5b4630', { cast: false }); // door
+  windowOn('S', x0, y0, x1, y1 - 0.42, 0.25, 0.6, 0.6, 1.4, WIN_LIT2); windowOn('S', x0, y0, x1, y1 - 0.42, 2.1, 2.45, 0.6, 1.4, WIN_LIT2);
+  windowGrid(x0, y0, x1, y1 - 0.42, ['E', 'W', 'N'], 0.55, 1.6, 0.62, 0.62, 911);
+  const gold = M('#d4a537', { r: 0.35, m: 0.65 });
+  box(x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.03, h - 0.1, h + 0.2, '#e8dcc3');       // entablature
+  box(x0 - 0.06, y1 + 0.02, x1 + 0.06, y1 + 0.05, h + 0.12, h + 0.18, null, { material: gold, cast: false });
+  gableY(x0 - 0.05, y0 - 0.05, x1 + 0.05, y1 + 0.03, h + 0.2, 0.62, '#c8b58a', { flat: true, r: 0.7 });
+  signPlane(signTexture('THE MINT', '#e8dcc3', '#5a4520', { spacing: 12, weight: 900 }), 'S', cx, y1 + 0.045, h + 0.05, 2.1, 0.24, [0.05, 0.7]);
+  // a big coin turning on the roof
+  const cc = textCanvas(256, 256), g = cc.getContext('2d');
+  g.fillStyle = '#e7b94a'; g.beginPath(); g.arc(128, 128, 126, 0, 7); g.fill();
+  g.strokeStyle = '#b8862a'; g.lineWidth = 14; g.beginPath(); g.arc(128, 128, 104, 0, 7); g.stroke();
+  g.fillStyle = '#9a6d1c'; g.font = `900 150px ${DISPLAY}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('$', 128, 138);
+  const ct = new THREE.CanvasTexture(cc); ct.colorSpace = THREE.SRGBColorSpace;
+  const face = nightMat(new THREE.MeshStandardMaterial({ map: ct, metalness: 0.55, roughness: 0.35, emissive: '#ffcf6a', emissiveMap: ct, emissiveIntensity: 0.05 }), 0.05, 0.55);
+  const rim = new THREE.MeshStandardMaterial({ color: '#c99a3a', metalness: 0.7, roughness: 0.3 });
+  mintCoin = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 40), [rim, face, face]);
+  mintCoin.geometry.rotateX(Math.PI / 2); mintCoin.position.set(cx, h + 1.45, (y0 + y1) / 2); mintCoin.castShadow = true;
+  addObj(mintCoin);
+  cyl(cx, (y0 + y1) / 2, 0.03, h + 0.7, h + 0.95, '#a8894a', { m: 0.6, r: 0.4 }, 6);
+  // coin stacks: the five largest dollar stablecoins on Ethereum, then all the rest
+  const st = D.stables, top = (st.top || []).slice(0, 5), rest = Math.max(0, st.eth - top.reduce((a, t) => a + t[2], 0));
+  const items = top.map((t, i) => ({ sym: t[0], v: t[2], color: stableColor(t[0], i) })).concat([{ sym: 'Other', v: rest, color: '#b8bec9' }]);
+  const vmax = Math.max(...items.map((t) => t.v));
+  items.forEach((t, i) => {
+    const hh = 0.12 + 1.45 * Math.sqrt(t.v / vmax), x = x0 + 0.2 + i * ((x1 - x0 - 0.4) / (items.length - 1)), y = 16.98;
+    const geo = new THREE.CylinderGeometry(0.17, 0.17, hh, 22, 1);
+    const uv = geo.attributes.uv; for (let k = 0; k < uv.count; k++) uv.setY(k, uv.getY(k) * hh / 0.8); // a coin edge every 0.1
+    geo.translate(x, 0.05 + hh / 2, y);
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: t.color, map: coinStripes(), roughness: 0.45, metalness: 0.35 }));
+    m.castShadow = true; m.receiveShadow = true; addObj(m);
+    t.x = x; t.h = hh;
+  });
+  MINT.items = items;
+  CIVIC.mint = endGroup();
+  addProxy({ type: 'mint' }, x0 - 0.2, y0 - 0.2, x1 + 0.2, 17.35, 3.4);
   LAMPS.push({ x: 32.65, y: 18.4 });
+}
+
+/* ---------- Builders' Row: who assembled each block, by self-reported tag. Height grows with share of recent blocks ---------- */
+const WORKSHOPS = [];
+const WS_COLORS = ['#b5533c', '#4f6d8f', '#c29a52', '#6f8f7a', '#8a8f99'];
+function builderSlots() {
+  const sh = (D.builders && D.builders.shares) || [], total = sh.reduce((a, x) => a + x[2], 0) || 1;
+  const named = sh.filter((x) => !['self', 'untagged', 'other'].includes(x[0])).slice(0, 3);
+  const keys = new Set(named.map((x) => x[0]));
+  const others = sh.filter((x) => !keys.has(x[0]) && x[0] !== 'self').reduce((a, x) => a + x[2], 0);
+  const self = (sh.find((x) => x[0] === 'self') || [0, 0, 0])[2];
+  return named.map((x) => ({ key: x[0], name: x[1], n: x[2] })).concat([{ key: 'others', name: 'Other builders', n: others }, { key: 'self', name: 'Self-built', n: self }])
+    .map((w) => ({ ...w, share: w.n / total }));
+}
+function workshopFor(tag) { const k = builderKey(tag); return WORKSHOPS.find((w) => w.key === k) || (k === 'self' ? WORKSHOPS.find((w) => w.key === 'self') : WORKSHOPS.find((w) => w.key === 'others')); }
+function buildBuilders() {
+  const slots = builderSlots(), maxS = Math.max(...slots.map((w) => w.share), 0.01);
+  const w = 2.7, gap = 0.5, y0 = 29.6, y1 = 30.85;
+  beginGroup('builders');
+  box(19.6, 29.45, 35.7, 30.95, 0, 0.03, '#cfc8ba', { cast: false }); // yard apron
+  slots.forEach((sl, i) => {
+    const x0 = 19.9 + i * (w + gap), x1 = x0 + w, h = 0.9 + 1.9 * Math.pow(sl.share / maxS, 0.7), col = WS_COLORS[i % WS_COLORS.length];
+    box(x0, y0, x1, y1, 0, h, col, { r: 0.9 });
+    box(x0 - 0.03, y0 - 0.03, x1 + 0.03, y1 + 0.03, 0, 0.12, '#3c4049', { cast: false });
+    // sawtooth roof: glazed faces look north, toward the tracks
+    for (let t = 0; t < 3; t++) {
+      const a = x0 + t * (w / 3) + 0.02, b = x0 + (t + 1) * (w / 3) - 0.02;
+      const sh = new THREE.Shape(); sh.moveTo(-y0, 0); sh.lineTo(-y1, 0); sh.lineTo(-y0, 0.42); sh.closePath();
+      const gg = new THREE.ExtrudeGeometry(sh, { depth: b - a, bevelEnabled: false }); gg.rotateY(Math.PI / 2); gg.translate(a, h, 0);
+      put(gg, '#5d636e', { flat: true, r: 0.7 });
+      box(a + 0.04, y0 - 0.02, b - 0.04, y0 + 0.01, h + 0.04, h + 0.38, null, { material: WIN_LIT, cast: false });
+    }
+    // loading doors toward the tracks; windows and the name board face the street side
+    box(x0 + 0.5, y0 - 0.02, x1 - 0.5, y0 + 0.01, 0.12, Math.min(1.1, h - 0.2), '#2c3038', { cast: false });
+    windowOn('S', x0, y0, x1, y1, 0.25, 0.7, 0.3, 0.75, WIN_LIT2); windowOn('S', x0, y0, x1, y1, 2.0, 2.45, 0.3, 0.75, WIN_LIT);
+    const label = `${sl.name.toUpperCase()} ${Math.round(sl.share * 100)}%`;
+    signPlane(signTexture(label, '#1d2130', '#ffe3a3', { spacing: 3, w: 1024, h: 180 }), 'S', (x0 + x1) / 2, y1 + 0.03, Math.max(0.95, h - 0.4), 2.35, 0.36, [0.3, 1.4]);
+    // roof beacon: flashes when this builder's block pulls in
+    const beacon = new THREE.MeshStandardMaterial({ color: '#fff3c4', emissive: '#ffd36b', emissiveIntensity: 0.15, roughness: 0.4 });
+    const bm = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), beacon); bm.position.set(x1 - 0.3, h + 0.55, y1 - 0.3); addObj(bm);
+    cyl(x1 - 0.3, y1 - 0.3, 0.025, h + 0.38, h + 0.46, '#8a8f99', { m: 0.5 }, 6);
+    WORKSHOPS.push({ ...sl, x0, x1, y0, y1, h, cx: (x0 + x1) / 2, beacon, flash: 0 });
+  });
+  CIVIC.builders = endGroup();
+  addProxy({ type: 'builders' }, 19.6, 29.45, 35.7, 30.95, 3.2);
 }
 
 function buildBurn() {

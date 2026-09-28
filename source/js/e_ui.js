@@ -102,10 +102,10 @@ function makeLabels() {
 const INFO = [
   { v: new THREE.Vector3(43.1, 0.95, 16.95), cls: 'in', go: 'vault', text: () => `Waiting to stake · ${compact(D.staking.entryQ, 2)} ETH` },
   { v: new THREE.Vector3(47.7, 0.85, 16.75), cls: 'out', go: 'vault', text: () => `Waiting to exit · ${compact(D.staking.exitQ, 0)} ETH` },
-  { v: new THREE.Vector3(45.6, 2.5, 2.2), cls: 'gold', go: 'vault', only: 'vault', text: () => 'Staking rewards → stakers' },
+  { v: new THREE.Vector3(45.6, 2.5, 2.2), cls: 'gold', go: 'vault', only: 'vault', text: () => 'Reward payouts → stakers' },
 ];
 const _pv = new THREE.Vector3();
-const PRIO = { station: 1, vault: 2, burn: 3 };
+const PRIO = { station: 1, vault: 2, burn: 3, mint: 4, builders: 5 };
 // panels that labels should not peek out from under (refreshed a few times a second)
 let panelRects = [], panelT = 0;
 function refreshPanels() {
@@ -189,7 +189,9 @@ function updateBoard(b) {
   $('#bClock').textContent = d.toISOString().slice(11, 19) + ' UTC';
   const cargo = (b.posters || []).slice(0, 4).map((p) => `<span class="sw" style="background:${containerColor(p[0])}"></span>${nameOf(p[0])} ${p[1]}`).join(' · ');
   $('#bCargo').innerHTML = `<em>FREIGHT</em>${b.blobs ? cargo + ((b.posters || []).length > 4 ? ' · …' : '') : 'No blobs this block'}`;
-  if (ST.stop === 1) refreshStationNow();
+  const t = STOPS[ST.stop] && STOPS[ST.stop].type;
+  if (t === 'station') refreshStationNow();
+  else if (t === 'builders') { const el = document.getElementById('buildersNow'); if (el && b.builder !== undefined) el.innerHTML = `Now boarding: block ${fmt(b.n)}, ${b.builder ? 'built by ' + esc(builderName(b.builder)) : 'with no builder tag'}.`; }
 }
 function updateSupply() {
   const slots = ST.T / 12;
@@ -295,7 +297,7 @@ const SRC = {
   etherscan: (n) => [`Block ${fmt(n)} on Etherscan`, `https://etherscan.io/block/${n}`, 'check this block yourself'],
   rpc: ['Ethereum JSON-RPC', 'https://ethereum.org/developers/docs/apis/json-rpc/', 'blocks, gas and fees, read from a public node'],
   blobscan: ['Blobscan', 'https://blobscan.com/', 'which network posted each blob'],
-  l2beat: ['L2BEAT · Activity', 'https://l2beat.com/layer2s/activity', 'the L2 ranking: 7-day average activity'],
+  l2beat: ['L2BEAT · Activity', 'https://l2beat.com/layer2s/activity', 'activity, one half of the district ranking'],
   l2beatProject: (s) => [`L2BEAT · ${s.name}`, `https://l2beat.com/layer2s/projects/${s.slug || s.key}`, 'activity, value secured, stage and risks'],
   stages: ['L2BEAT · Stages framework', 'https://l2beat.com/stages', 'what Stage 0, 1 and 2 mean'],
   vq: ['validatorqueue.com', 'https://www.validatorqueue.com/', 'stake, validators, queues and staking rate (beaconcha.in data)'],
@@ -314,6 +316,12 @@ const SRC = {
   eip7918: ['EIP-7918', 'https://eips.ethereum.org/EIPS/eip-7918', 'the blob fee floor'],
   eip7251: ['EIP-7251', 'https://eips.ethereum.org/EIPS/eip-7251', 'validator consolidations'],
   eoMev: ['ethereum.org · MEV', 'https://ethereum.org/developers/docs/mev/', 'block builders, relays and MEV-Boost'],
+  relayscan: ['relayscan.io', 'https://www.relayscan.io/', 'MEV-Boost builders and relays, day by day'],
+  eoStable: ['ethereum.org · Stablecoins', 'https://ethereum.org/stablecoins/', 'how the different kinds work'],
+  rwa: ['RWA.xyz', 'https://app.rwa.xyz/', 'tokenized real-world assets by network'],
+  llamaRwa: ['DefiLlama · RWA', 'https://defillama.com/rwa', 'tokenized assets dashboard'],
+  l2beatRisk: ['L2BEAT · Risk analysis', 'https://l2beat.com/layer2s/risk', 'the five risk categories, for every L2'],
+  eoWithdrawals: ['ethereum.org · Staking withdrawals', 'https://ethereum.org/staking/withdrawals/', 'how the payout sweep works'],
   eoFinality: ['ethereum.org · Finality', 'https://ethereum.org/developers/docs/consensus-mechanisms/pos/#finality', 'when a block can no longer change'],
 };
 
@@ -333,6 +341,8 @@ const L2_ABOUT = {
   worldchain: 'The World Foundation’s L2 for the World app, built on the OP Stack. It gives priority blockspace to people verified with World ID.',
   unichain: 'Uniswap Labs’ L2 for DeFi, built on the OP Stack.',
   ink: 'Kraken’s L2: an optimistic rollup built with the OP Stack.',
+  starknet: 'A general-purpose ZK rollup built by StarkWare. It runs its own virtual machine and language (Cairo) and proves its results to Ethereum with STARK proofs.',
+  gnosis: 'A proof-of-stake chain that began as xDai in 2018. Its own validators, who stake GNO, secure it, and it connects to Ethereum through bridges.',
 };
 // why L2BEAT lists a project under "Others" (from its project pages, Sep 28, 2026); shown only while it is still there
 const OTHERS_WHY = {
@@ -343,6 +353,7 @@ const OTHERS_WHY = {
   megaeth: 'fewer than five outside parties can challenge its results, and it has no data-availability bridge',
   fuel: 'it has no working proof system and no data-availability bridge',
   'polygon-pos': 'it has no working proof system',
+  gnosis: 'Ethereum doesn’t check its results and it has no data-availability bridge',
 };
 const STAGE_TEXT = {
   'Stage 0': '<b>Full training wheels.</b> It has a working proof system, but its operators can still override it.',
@@ -354,6 +365,28 @@ const DA_TEXT = {
   eigenda: 'Posts its data to EigenDA, an external data network; Ethereum receives only commitments to it.',
   own: 'Relies on its own validator network for data and posts periodic checkpoints to Ethereum.',
 };
+/* ---------- L2BEAT's risk summary: five categories, each rated good / warning / bad ---------- */
+const RISK_LABEL = { 'State Validation': 'State validation', 'Data Availability': 'Data availability', 'Exit Window': 'Exit window', 'Proposer Failure': 'Proposer failure', 'Sequencer Failure': 'Sequencer failure' };
+const RISK_HELP = {
+  'State Validation': 'how Ethereum checks the L2’s results: with validity (ZK) proofs, with fraud proofs that anyone or only a few can submit, or not at all.',
+  'Data Availability': 'where the data needed to rebuild the chain is published, and whether Ethereum can check that it was.',
+  'Exit Window': 'how long users have to leave before an unwanted upgrade takes effect.',
+  'Proposer Failure': 'what users can do if whoever posts the L2’s results to Ethereum stops.',
+  'Sequencer Failure': 'what users can do if the operator stops including their transactions.',
+};
+const RISK_WORD = { good: 'good', warning: 'caution', bad: 'risk' };
+const RISK_ICON = {
+  good: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="m2.5 6.3 2.3 2.3 4.7-5" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  warning: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2.2v4.6" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="6" cy="9.4" r="1.1" fill="currentColor"/></svg>',
+  bad: '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="m3 3 6 6M9 3 3 9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>',
+};
+function riskBlock(s) {
+  const by = Object.fromEntries((s.risks || []).map((r) => [r[0], r]));
+  const rows = RISK_ORDER.map((n) => by[n]).filter(Boolean);
+  if (!rows.length) return '';
+  return block('Risk summary · L2BEAT', `<ul class="risks">${rows.map(([n, v, sent, reg]) => `<li class="r-${sent || 'none'}"><span class="ri">${RISK_ICON[sent] || ''}</span><span class="rn">${RISK_LABEL[n] || n}</span><span class="rv">${esc(v)}${reg ? ` <small>· ${esc(reg)} for regular upgrades</small>` : ''}<span class="sr"> (${RISK_WORD[sent] || 'not rated'})</span></span></li>`).join('')}</ul>`
+    + `<details class="more"><summary>What these mean</summary>${paras(...RISK_ORDER.map((n) => `<b>${RISK_LABEL[n]}:</b> ${RISK_HELP[n]}`), 'The rosette on the roof shows the same five ratings in this order, starting with the slice nearest the back of the building and going clockwise: green is good, amber a caution, red a risk. The ratings are L2BEAT’s.')}</details>`);
+}
 function stackFamily(s) { const t = s.stack || ''; return /OP Stack/.test(t) ? 'OP Stack' : /Arbitrum|Orbit/.test(t) ? 'Arbitrum stack' : null; }
 
 /* ---------- overview ---------- */
@@ -368,15 +401,18 @@ function overviewCard() {
   const blobWin = D.blobLive ? `in the last ${hoursLabel(D.l1.blobSourceDays)}` : 'in the 24 hours to Sep 28';
   const map = [
     ['station', '#4453d0', 'Mainnet Station', 'Ethereum’s base layer (L1). A train leaves every 12 seconds, and each one is a real block.'],
-    ['l2', 'conic-gradient(#0052ff 0 25%, #ff0420 0 50%, #c6f500 0 75%, #f50db4 0)', `The ${SHOPS.length} shops`, `The busiest L2 networks by activity on L2BEAT. Taller means more value secured; a bigger crowd means more activity.`],
+    ['builders', '#b5533c', 'Builders’ Row', 'Across the tracks: the builders who assemble each block. The one that built the arriving train lights up.'],
+    ['l2', 'conic-gradient(#0052ff 0 25%, #ff0420 0 50%, #c6f500 0 75%, #f50db4 0)', `The ${SHOPS.length} shops`, `The L2 networks that rank best on activity and value secured combined (L2BEAT). Taller means more value secured; a bigger crowd means more activity; the rosette on the roof is L2BEAT’s risk summary.`],
     [null, '#c7ad86', 'Trucks and couriers', `${nBlob} of the ${SHOPS.length} post their data to Ethereum as blobs and send trucks to the station. The other ${nOff} keep their data elsewhere and send couriers.`],
     ['vault', '#bcd0ff', 'Beacon Vault', 'Staking: validators lock ETH here to secure the chain. The people lined up outside are ETH waiting to be staked; gold sparks are rewards.'],
     ['burn', '#ff7a3d', 'The Burn', 'Where fees are burned. The tower next door keeps a running count of all ETH in existence.'],
+    ['mint', '#d4a537', 'The Mint', 'Stablecoins on Ethereum: the coin stacks out front are the five biggest dollar stablecoins, sized by supply.'],
   ];
   const facts = [
     `<b>${top.name}</b> accounts for about ${Math.round(top.uops / a.uops * 100)}% of all L2 activity that L2BEAT tracks.`,
     two.length === 2 ? `<b>${two[0].name} and ${two[1].name}</b> posted ${Math.round((two[0].share + two[1].share) * 100)}% of all blob data ${blobWin}.` : '',
     `<b>Blob space</b> is running at about ${Math.round(l1.blobsPerBlock / l1.blobTarget * 100)}% of its target, so L2s pay close to the minimum for data.`,
+    builderFact(),
     `<b>${compact(s.entryQ, 2)} ETH</b> is waiting to start staking, about a ${Math.round(s.entryWait)}-day wait.`,
     `<b>${fmt(sp.issuedPerDay, 0)} ETH</b> is issued and <b>${fmt(sp.burnedPerDay, 0)} ETH</b> burned a day (7-day average), so supply grows about ${sp.growthPct.toFixed(2)}% a year.`,
     `<b>$${(st.eth / 1e9).toFixed(0)}B</b> in dollar stablecoins sits on Ethereum mainnet, ${Math.round(st.share * 100)}% of all dollar stablecoins.`,
@@ -392,8 +428,16 @@ function overviewCard() {
       : `<li><div><i style="background:${c}"></i><span><b>${name}</b> ${text}</span></div></li>`).join('')}</ul>`)
     + seeList(facts, 'Notable today')
     + `<div class="btnrow"><button class="btn primary" data-act="tour">Start the tour</button><button class="btn" data-act="about">About the data</button></div>`
-    + sourceList([SRC.l2beat, SRC.blobscan, SRC.vq, SRC.usm, SRC.llama, SRC.rpc], asOf() + '.')
+    + sourceList([SRC.l2beat, SRC.blobscan, SRC.vq, SRC.usm, SRC.llama, SRC.relayscan, SRC.rpc], asOf() + '.')
     + cardEnd();
+}
+function builderWindow() { const B = D.builders; return B.minutes ? `the last ${B.minutes} minutes` : `${D.replay.from}–${D.replay.to} UTC, Sep 28`; }
+function builderFact() {
+  const sh = D.builders.shares, tot = sh.reduce((a, x) => a + x[2], 0) || 1;
+  const named = sh.filter((x) => !['self', 'untagged', 'other'].includes(x[0]));
+  if (!named.length) return '';
+  const top3 = named.slice(0, 3).reduce((a, x) => a + x[2], 0);
+  return `<b>${esc(named[0][1])}</b> built ${Math.round(named[0][2] / tot * 100)}% of the last ${fmt(D.builders.blocks)} blocks by their own tags, and the three biggest builders ${Math.round(top3 / tot * 100)}%.`;
 }
 // a year-on-year change is only like-for-like for the 7-day snapshot; live numbers are a 24-hour sample
 function txTrend(l1) { return l1.window === '24h' ? 'Sampled over the last 24 hours' : delta(l1.txPerDay / l1.txPerDayYearAgo - 1, 'up', 'vs last year'); }
@@ -405,8 +449,8 @@ function cardEnd() {
 /* ---------- Mainnet Station ---------- */
 // builders sign most blocks in extraData; an execution client's own tag means the proposer built the block itself
 function builderText(tag) {
-  const own = /^(geth|reth|nethermind|besu|erigon)/i.exec(tag.replace(/[^a-z0-9 .()/_-]/gi, ''));
-  return own ? `Built by the proposer’s own node software (${esc(own[1][0].toUpperCase() + own[1].slice(1).toLowerCase())})` : `Builder’s tag: <b>${esc(tag)}</b>`;
+  if (!tag) return 'No builder tag in this block';
+  return builderKey(tag) === 'self' ? `Built by ${esc(builderName(tag))}` : `Builder’s tag: <b>${esc(tag)}</b> (self-reported)`;
 }
 function stationNowHTML() {
   const b = boardBlock; if (!b) return '<div class="block" id="stationNow" hidden></div>'; // filled when the first train arrives
@@ -419,7 +463,7 @@ function stationNowHTML() {
     ${stat('Burned by this block', b.burn.toFixed(4) + '<small>ETH</small>', b.baseFee.toFixed(3) + ' gwei base fee')}
     ${stat('Sending ETH costs', '≈' + dollars(txCost(21000, b)), `A token swap ≈${dollars(txCost(150000, b))}${tip ? '' : ', before tips'}`)}
     ${fin ? stat('Final up to block', fmt(fin.n), `≈${Math.max(1, Math.round((b.ts - fin.ts) / 60))} min behind this one`) : ''}</div>
-    ${live && b.builder ? `<p class="foot">${builderText(b.builder)}${/^Built by/.test(builderText(b.builder)) ? '' : ' (self-reported in the block)'}</p>` : ''}
+    ${b.builder !== undefined ? `<p class="foot"><button type="button" class="linkish" data-go="builders">${builderText(b.builder)}</button></p>` : ''}
     <p class="foot">${ext(`https://etherscan.io/block/${b.n}`, `Look up block ${fmt(b.n)} on Etherscan`)}</p></div>`;
 }
 function refreshStationNow() { const el = document.getElementById('stationNow'); if (el) el.outerHTML = stationNowHTML(); }
@@ -451,7 +495,7 @@ function stationCard() {
       `<b>Finality.</b> A block becomes final after two to three epochs (about 13 to 19 minutes), once validators holding at least two-thirds of all staked ETH have voted for it. Reversing a final block would cost an attacker at least a third of all staked ETH, about ${compact(D.staking.staked / 3, 1)} ETH, which the protocol would destroy (slash).`))
     + `<details class="block more"><summary>Who builds the blocks, and what they cost</summary>${paras(
       'Most validators don’t assemble their own blocks. Through MEV-Boost, specialized builders compete to put together the most valuable block, and the validator whose turn it is takes the best bid. Builders usually sign the block’s extra-data field, which is where the builder’s tag comes from; it is self-reported.',
-      `<b>Costs are estimates.</b> Sending ETH uses 21,000 gas and a typical token swap about 150,000, priced at the block’s base fee${live ? ' plus the median tip of the last few blocks' : ' before tips'}, with ETH at ${usd(D.price)}. The blob cost is the average fee per blob over the period.`)}</details>`
+      `<b>Costs are estimates.</b> Sending ETH uses 21,000 gas and a typical token swap about 150,000, priced at the block’s base fee${live ? ' plus the typical (median) tip of the last 10 blocks' : ' before tips'}, with ETH at ${usd(D.price)}. The blob cost is the average fee per blob over the period.`)}</details>`
     + sourceList([SRC.rpc, SRC.blobscan, SRC.eoBlocks, SRC.eoFinality, SRC.eoMev, SRC.eoDank, SRC.eip4844, SRC.eip7918], `Blob attribution uses Blobscan labels, matched to L2BEAT’s list of batch-poster addresses where unlabeled. ${asOf()}.`)
     + cardEnd();
 }
@@ -472,7 +516,7 @@ function l2Card(shop) {
     : `<b>Not rated.</b> L2BEAT lists it under “Others”, its group for L2s that lack a working proof system or enough data-availability guarantees, so it gets no stage.${why ? ' Its L2BEAT page notes that ' + why + '.' : ''}`;
   const about = L2_ABOUT[s.key] || `${s.category}${s.stack && s.stack !== 'Independent' ? ' built on ' + s.stack : ''}.`;
   const withToken = s.tvsTotal && s.ownToken && s.tvsTotal > s.tvs * 1.05; // its own token is a real part of the total
-  return head(`L2 · #${s.rank} by activity`, s.name, about, s.brand.id)
+  return head(s.ru && s.rv ? `L2 · #${s.ru} by activity · #${s.rv} by value` : `L2 · #${s.rank} in town`, s.name, about, s.brand.id)
     + `<div class="tags">${stageTag}${da}</div>`
     + `<div class="stats">${stat('Activity, 7-day avg', fmt(s.uops, s.uops < 10 ? 1 : 0) + '<small>ops/s</small>', delta(s.wow, 'up', 'vs prior week'))}
       ${stat('Value secured', usd(s.tvs), withToken ? `${usd(s.tvsTotal)} with its ${esc(s.ownToken)} token` : delta(s.tvs7d, 'up', 'in 7 days'))}
@@ -486,17 +530,19 @@ function l2Card(shop) {
     ])
     + (sp ? `<div class="block"><h3>Daily activity, last 30 days</h3>${sp}</div>` : '')
     + block('How it’s secured', paras(stageText, `<b>Data.</b> ${DA_TEXT[s.da] || ''}`, 'Stages measure how much a chain still depends on its operators, not how safe it is overall.'))
+    + riskBlock(s)
     + `<details class="block more"><summary>What’s an L2?</summary>${paras(
       'An L2 runs its own network and settles to Ethereum: it batches many transactions, then posts its data (or a commitment to it) and a proof or claim about the result to mainnet. That lets it handle far more activity at lower cost, while leaning on Ethereum for security to a degree that depends on its design.',
       '<b>Activity</b> is L2BEAT’s user operations per second (UOPS). <b>Value secured</b> counts the assets held on the L2: bridged from Ethereum, bridged via third-party bridges, and minted natively. It leaves out the chain’s own token (such as ARB or OP), whose price would otherwise dominate for some chains.')}</details>`
-    + sourceList([SRC.l2beatProject(s), s.da === 'blobs' ? SRC.blobscan : null, SRC.stages, SRC.eoL2],
+    + sourceList([SRC.l2beatProject(s), s.da === 'blobs' ? SRC.blobscan : null, SRC.stages, SRC.l2beatRisk, SRC.eoL2],
       `Activity and value secured are 7-day averages${ST.mode === 'live' ? '' : ' to Sep 27'}; blobs a day are ${D.blobLive ? 'projected from the last ' + hoursLabel(D.l1.blobSourceDays) : 'counted over the 24 hours to Sep 28'}. Colors nod to each network’s brand.`)
     + cardEnd();
 }
 
 /* ---------- Beacon Vault ---------- */
 function vaultCard() {
-  const s = D.staking, hist = s.hist, sp = D.supply;
+  const s = D.staking, hist = s.hist, sp = D.supply, P = D.payouts;
+  const sweep = s.validators / (P.perBlock * 7200); // days for the payout sweep to reach everyone
   const issueShare = clamp(Math.floor((sp.issuedPerDay * 365) / s.staked / (s.apr / 100) * 100) / 100, 0, 1);
   const capped = s.entryQ / 20000 > 96 || s.exitQ / 20000 > 16;
   const xn = s.exitNote && s.exitNote.expires && Date.now() < Date.parse(s.exitNote.expires) ? s.exitNote : null; // a dated fact-check, shown only while it is recent
@@ -505,11 +551,14 @@ function vaultCard() {
       ${stat('Active validators', fmt(s.validators))}
       ${stat('Waiting to stake', compact(s.entryQ, 2) + '<small>ETH</small>', '≈' + s.entryWait.toFixed(1) + '-day wait')}
       ${stat('Waiting to exit', compact(s.exitQ, 0) + '<small>ETH</small>', '≈' + s.exitWait.toFixed(1) + '-day wait')}
+      ${stat('Rewards paid out', '≈' + fmt(P.skimPerDay) + '<small>ETH a day</small>', `≈${P.skimPerBlock.toFixed(2)} ETH per block, to up to ${P.perBlock} validators`)}
+      ${stat('Typical payout', P.median.toFixed(3) + '<small>ETH</small>', `per validator, about every ${Math.round(sweep)} days`)}
       ${stat('Staking rate', s.apr.toFixed(2) + '%<small>a year</small>', `≈${Math.round(issueShare * 100)}% of it is newly issued ETH`, true)}</div>`
     + seeList([
       `<b>The people lined up outside</b> are ETH waiting to be staked, about 20,000 ETH per figure. The front of the line walks in through the <b>IN</b> door and newcomers join the back; the line’s length is real, the pace is sped up (the real line moves about one figure every ${Math.round(20000 / s.churn * 6.4 / 60)} hours).${capped ? ' The lines stop growing at 96 and 9 figures.' : ''}`,
       '<b>The short row by the OUT door</b> is the exit queue: figures come out of the vault and head for the street.',
-      `<b>Gold sparks leaving the vault</b> are staking rewards, with a burst every epoch (6.4 minutes). They fly to the homes on the hill, standing in for everyone who stakes: ${fmt(s.validators)} validators share them.`,
+      `<b>Gold sparks are real payouts.</b> Every block carries up to ${P.perBlock} withdrawals (the withdrawal sweep), mostly rewards that validators have built up above 32 ETH: about ${P.skimPerBlock.toFixed(2)} ETH per block, so each validator is paid roughly every ${Math.round(sweep)} days. The sparks fly to the homes on the hill, standing in for everyone who stakes.`,
+      '<b>A figure walking out of the OUT door</b> marks a withdrawal of 1 ETH or more in that block, which is usually stake leaving (an exit, or a partial withdrawal someone asked for) rather than a routine payout. <b>The vault glows</b> at each epoch boundary (every 6.4 minutes), when attestation rewards are credited to validator balances; proposer rewards arrive with each block.',
     ])
     + `<div class="block"><h3>Entry queue, last 90 days (ETH)</h3>${spark(hist.map((r) => r[1]), { zero: true, fmt: (v) => compact(v, 2) + ' ETH', labelAt: (i) => '· ' + hist[i][0], left: hist[0][0], right: hist[hist.length - 1][0], aria: 'Entry queue over 90 days' })}</div>`
     + `<div class="block"><h3>Exit queue, last 90 days (ETH)</h3>${spark(hist.map((r) => r[2]), { zero: true, fmt: (v) => compact(v, 1) + ' ETH', labelAt: (i) => '· ' + hist[i][0], left: hist[0][0], right: hist[hist.length - 1][0], aria: 'Exit queue over 90 days' })}</div>`
@@ -517,7 +566,7 @@ function vaultCard() {
       `The protocol limits how fast ETH can join or leave staking: up to ${s.churn} ETH per 6.4-minute epoch in each direction, so surges wait in line. A long entry queue means more ETH wants to be staked than the protocol lets in at once.`,
       xn ? `<b>About the exit line:</b> on ${xn.date}, about ${Math.round(xn.consolidationShare * 100)}% of it was validators merging into bigger ones (consolidations, EIP-7251). That ETH stays staked; only about ${fmt(xn.unstakingEth)} ETH was actually leaving staking.` : '',
       `<b>The staking rate</b> comes from beaconcha.in’s ETH.STORE index. About ${Math.round(issueShare * 100)}% of it is newly issued ETH and the rest is priority fees; MEV payments aren’t counted, so all-in returns run slightly higher.`))
-    + sourceList([SRC.vq, SRC.ethstore, SRC.eoPos, SRC.eoStaking, SRC.eip7251], asOf() + '.')
+    + sourceList([SRC.vq, SRC.ethstore, SRC.eoWithdrawals, SRC.eoPos, SRC.eoStaking, SRC.eip7251], `Payouts are the withdrawals in ${P.blocks ? 'the last ' + fmt(P.blocks) + ' blocks' : 'the ' + fmt(D.replay.blocks.length) + ' replay blocks'}, read from a public node. ${asOf()}.`)
     + cardEnd();
 }
 
@@ -544,6 +593,57 @@ function burnCard() {
     + cardEnd();
 }
 
+/* ---------- Builders' Row ---------- */
+function buildersCard() {
+  const B = D.builders, sh = B.shares, tot = sh.reduce((a, x) => a + x[2], 0) || 1;
+  const named = sh.filter((x) => !['self', 'untagged', 'other'].includes(x[0]));
+  const top = named[0], top3 = named.slice(0, 3).reduce((a, x) => a + x[2], 0);
+  const self = (sh.find((x) => x[0] === 'self') || [0, 0, 0])[2];
+  const win = builderWindow(), bars = sh.slice(0, 8), maxS = Math.max(...bars.map((x) => x[2]));
+  const cur = boardBlock && boardBlock.builder !== undefined && (ST.mode !== 'live' || boardBlock.live) ? boardBlock : null;
+  return head('Block building · MEV-Boost', 'Builders’ Row', 'Most validators don’t assemble their own blocks. Specialized builders compete to pack the most valuable block, and the validator whose turn it is signs the best bid. Builders usually sign their blocks with a name tag.', '#b5533c')
+    + `<div class="stats">${stat('Biggest builder', top ? esc(top[1]) : '–', top ? Math.round(top[2] / tot * 100) + '% of blocks' : '')}
+      ${stat('Top three together', Math.round(top3 / tot * 100) + '%', 'of blocks')}
+      ${stat('Built by validators', Math.round(self / tot * 100) + '%', 'with their own node, no auction')}
+      ${stat('Blocks counted', fmt(B.blocks), win)}</div>`
+    + (cur ? `<p class="foot" id="buildersNow">Now boarding: block ${fmt(cur.n)}, ${cur.builder ? 'built by ' + esc(builderName(cur.builder)) : 'with no builder tag'}.</p>` : '')
+    + `<div class="block"><h3>Share of blocks · ${win}</h3><div class="bars">${bars.map((x) => `<span class="n">${esc(x[1])}</span><span class="t" style="width:${(x[2] / maxS * 100).toFixed(1)}%"></span><span class="p">${(x[2] / tot * 100).toFixed(1)}%</span>`).join('')}</div></div>`
+    + seeList([
+      '<b>Each workshop</b> is a builder, or a group of smaller ones. It is taller when it built more of the recent blocks, and its sign shows that share.',
+      '<b>When a train pulls in</b>, the workshop that built its block lights up and sends the block across the tracks.',
+      '<b>Self-built</b> blocks were put together by the proposing validator’s own node software, outside the auction.',
+    ])
+    + block('Why it matters', paras(
+      'Building a block well takes speed, capital and access to transactions, so a few builders make most blocks. The value of choosing and ordering transactions well, such as arbitrage between exchanges, is called MEV (maximal extractable value); competition pushes builders to pass most of it to validators through their bids.',
+      'Splitting the roles this way keeps validators simple to run but concentrates block building. Today relays sit in between as trusted middlemen: they hold each block until the validator commits to it, and vouch that it is valid. The name tags are self-reported, so they show who says they built a block.'))
+    + sourceList([SRC.eoMev, SRC.relayscan, SRC.rpc], `Builder tags come from each block’s extra-data field, counted over ${win}. ${asOf()}.`)
+    + cardEnd();
+}
+
+/* ---------- The Mint ---------- */
+function mintCard() {
+  const st = D.stables, top = (st.top || []).slice(0, 5), rest = Math.max(0, st.eth - top.reduce((a, t) => a + t[2], 0));
+  const rows = top.map((t, i) => ({ sym: t[0], name: t[1], v: t[2], kind: t[3], color: stableColor(t[0], i) })).concat([{ sym: 'Others', name: 'all other dollar stablecoins', v: rest, kind: '', color: '#b8bec9' }]);
+  const maxV = Math.max(...rows.map((r) => r.v));
+  return head('Stablecoins · Ethereum mainnet', 'The Mint', 'Stablecoins are tokens that track a currency, almost always the US dollar. Most are issued by companies that hold cash and short-term US Treasury bills in reserve; others are backed by crypto locked in smart contracts.', '#d4a537')
+    + `<div class="stats">${stat('Dollar stablecoins here', usd(st.eth), Math.round(st.share * 100) + '% of all, on every chain')}
+      ${stat('Change in a year', st.ethYoY != null ? pct(st.ethYoY) : '–', 'Sep 28 vs a year before')}
+      ${stat('Largest', esc(rows[0].sym), usd(rows[0].v))}
+      ${stat('Two largest', Math.round((rows[0].v + rows[1].v) / st.eth * 100) + '%', 'of the supply here')}</div>`
+    + `<div class="block"><h3>Supply on Ethereum mainnet</h3><div class="bars">${rows.map((r) => `<span class="n"><i style="background:${r.color}"></i>${esc(r.sym)}</span><span class="t" style="width:${(r.v / maxV * 100).toFixed(1)}%"></span><span class="p">${usd(r.v)}</span>`).join('')}</div>
+      <p class="foot">${rows.slice(0, 5).map((r) => `${esc(r.sym)}: ${esc(r.name)}${r.kind ? ', ' + esc(r.kind) : ''}`).join(' · ')}. Backing types are DefiLlama’s.</p></div>`
+    + seeList([
+      '<b>The coin stacks</b> out front are the five largest dollar stablecoins on Ethereum mainnet, plus everything else. Height grows with the square root of supply; colors nod to each issuer.',
+      '<b>The coin on the roof</b> just turns. Stablecoins on L2s aren’t counted here.',
+    ])
+    + block('Why it matters', paras(
+      'Stablecoins are how dollars move on Ethereum: they are used for trading, lending and payments, and settle around the clock.',
+      '<b>Fiat-backed</b> coins depend on their issuer, which holds the reserves and can freeze tokens at specific addresses. <b>Crypto-backed</b> coins rely on collateral and smart contracts instead.',
+      '<b>Tokenized real-world assets</b> apply the same idea to other things, such as Treasury funds, private credit and gold. RWA.xyz and DefiLlama track them by network.'))
+    + sourceList([SRC.llama, SRC.eoStable, SRC.rwa, SRC.llamaRwa], `Supply as tracked by DefiLlama${ST.mode === 'live' && D.liveAsOf ? ', refreshed ' + D.liveAsOf : ', ' + (st.asOf || 'Sep 28, 2026')}.`)
+    + cardEnd();
+}
+
 function renderCard() {
   SPARKS.clear();
   const s = STOPS[ST.stop];
@@ -552,31 +652,72 @@ function renderCard() {
   else if (s.type === 'station') html = stationCard();
   else if (s.type === 'l2') html = l2Card(s.shop);
   else if (s.type === 'vault') html = vaultCard();
+  else if (s.type === 'builders') html = buildersCard();
+  else if (s.type === 'mint') html = mintCard();
   else html = burnCard();
-  card.innerHTML = html;
+  card.innerHTML = SMALL ? `<div class="grab" aria-hidden="true"><i></i></div><div class="sheet-body">${html}</div>` : html;
   card.scrollTop = 0;
   bindSparks();
-  card.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => {
-    e.stopPropagation();
-    if (b.dataset.act === 'tour') setTour(true);
-    else if (b.dataset.act === 'about') openAbout();
-    else if (b.dataset.act === 'next') { setTour(false); selectStop(ST.stop + 1); }
-    else if (b.dataset.act === 'share') shareStop(b);
-  }));
-  card.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
-    const i = STOPS.findIndex((x) => x.type === b.dataset.go); if (i >= 0) { setTour(false); selectStop(i); }
-  }));
   if (SMALL) {
-    card.classList.add('collapsed');
     const hd = card.querySelector('.card-head');
-    if (hd) { hd.setAttribute('role', 'button'); hd.tabIndex = 0; hd.setAttribute('aria-expanded', 'false'); hd.setAttribute('aria-label', STOPS[ST.stop].name + ': show details'); }
+    if (hd) { hd.setAttribute('role', 'button'); hd.tabIndex = 0; }
+    setSheet(SHEET.state === 'full' ? 'half' : SHEET.state, false);
   }
   layoutMobile();
 }
-function toggleCard() {
-  const open = !card.classList.toggle('collapsed');
-  const hd = card.querySelector('.card-head');
+/* ---------- phones: the card is a bottom sheet with three heights. Drag the handle, or tap the title ---------- */
+const SHEET = { state: 'peek', drag: null, justDragged: 0 };
+function sheetHeights() {
+  const app = $('#app').getBoundingClientRect(), dock = document.querySelector('.dock').getBoundingClientRect();
+  const plaque = document.querySelector('.plaque').getBoundingClientRect(), hd = card.querySelector('.card-head');
+  const below = app.bottom - dock.top + 10; // the sheet sits just above the dock
+  const peek = Math.round((hd ? hd.offsetHeight : 60) + 26); // handle + title, and nothing below it
+  const full = Math.max(peek + 60, Math.round(app.height - below - (plaque.bottom - app.top) - 10));
+  const half = Math.max(peek + 40, Math.min(full, Math.round(app.height * 0.46)));
+  return { peek, half, full, below };
+}
+function setSheet(state, animate = true) {
+  if (!SMALL) return;
+  SHEET.state = state; card.dataset.sheet = state;
+  const H = sheetHeights();
+  card.style.transition = animate && !RM ? 'height .28s cubic-bezier(.2,.8,.2,1)' : 'none';
+  card.style.height = H[state] + 'px';
+  const hd = card.querySelector('.card-head'), open = state !== 'peek';
   if (hd) { hd.setAttribute('aria-expanded', String(open)); hd.setAttribute('aria-label', STOPS[ST.stop].name + (open ? ': hide details' : ': show details')); }
+  const body = card.querySelector('.sheet-body'); if (body && !open) body.scrollTop = 0;
+}
+function toggleCard() { setSheet(SHEET.state === 'peek' ? 'half' : 'peek'); }
+function bindSheet() {
+  if (!SMALL) return;
+  card.addEventListener('pointerdown', (e) => {
+    const body = card.querySelector('.sheet-body');
+    const onHead = e.target.closest('.card-head') && SHEET.state === 'peek';
+    if (!e.target.closest('.grab') && !onHead && !(e.target.closest('.card-head') && body && body.scrollTop <= 0)) return;
+    const now = performance.now();
+    SHEET.drag = { y: e.clientY, h: card.getBoundingClientRect().height, id: e.pointerId, moved: false, lastY: e.clientY, lastT: now, v: 0 };
+  });
+  window.addEventListener('pointermove', (e) => {
+    const d = SHEET.drag; if (!d || e.pointerId !== d.id) return;
+    const dy = d.y - e.clientY;
+    if (!d.moved && Math.abs(dy) < 6) return;
+    if (!d.moved) { d.moved = true; card.style.transition = 'none'; }
+    const H = sheetHeights(), now = performance.now();
+    card.style.height = clamp(d.h + dy, H.peek, H.full) + 'px';
+    d.v = (d.lastY - e.clientY) / Math.max(1, now - d.lastT); d.lastY = e.clientY; d.lastT = now;
+  });
+  const end = (e) => {
+    const d = SHEET.drag; if (!d || e.pointerId !== d.id) return;
+    SHEET.drag = null;
+    if (!d.moved) return; // a tap: the click handler toggles
+    SHEET.justDragged = performance.now();
+    const H = sheetHeights(), h = card.getBoundingClientRect().height;
+    let target;
+    if (d.v > 0.45) target = h < H.half ? 'half' : 'full';
+    else if (d.v < -0.45) target = h > H.half ? 'half' : 'peek';
+    else target = ['peek', 'half', 'full'].reduce((a, b) => (Math.abs(H[b] - h) < Math.abs(H[a] - h) ? b : a));
+    setSheet(target);
+  };
+  window.addEventListener('pointerup', end); window.addEventListener('pointercancel', end);
 }
 /* ---------- shareable links: every stop has its own address ---------- */
 const SITE_URL = 'https://ethereum-town.vercel.app/';
@@ -610,12 +751,14 @@ function buildStops() {
   STOPS.length = 0;
   STOPS.push({ type: 'overview', name: 'Ethereum Town', view: { t: [26.5, 0, 16.2], d: SMALL ? 112 : 80, p: 0.88, a: 0.66 } });
   STOPS.push({ type: 'station', name: 'Mainnet Station', short: 'Mainnet Station', group: CIVIC.station, anchor: [28, 8.4, 22.8], view: { t: [28.4, 1.2, 23.6], d: 27, p: 0.98, a: 0.52 } });
+  STOPS.push({ type: 'builders', name: 'Builders’ Row', short: 'Builders’ Row', group: CIVIC.builders, anchor: [27.65, 3.7, 30.2], view: { t: [27.4, 1.0, 28.4], d: 31, p: 0.97, a: 0.1 } });
   for (const s of [...SHOPS].sort((a, b) => a.rank - b.rank)) {
     const behindStation = s.row === 1 && s.cx > 20.5 && s.cx < 35;
     STOPS.push({ type: 'l2', name: s.name, shop: s, group: s.grp, anchor: [s.cx, s.h + 1.05, s.cy], view: { t: [s.cx, Math.min(2.6, s.h * 0.4), s.y1 + 0.3], d: 12.5 + s.h * 1.45, p: s.row === 2 ? 0.8 : 0.92, a: behindStation ? (s.cx > 27.5 ? 1.05 : -0.75) : 0.55 } });
   }
   STOPS.push({ type: 'vault', name: 'Beacon Vault', short: 'Beacon Vault', group: CIVIC.vault, anchor: [44, 4.9, 14], view: { t: [42.4, 1.5, 15.7], d: 24, p: 0.86, a: -0.45 } });
   STOPS.push({ type: 'burn', name: 'The Burn', short: 'The Burn · Supply', group: CIVIC.burn, anchor: [45.2, 9.6, 22.8], view: { t: [43.3, 2.8, 23.0], d: 22, p: 0.98, a: 0.62 } });
+  STOPS.push({ type: 'mint', name: 'The Mint', short: 'The Mint · Stablecoins', group: CIVIC.mint, anchor: [34.5, 4.3, 15.4], view: { t: [34.5, 1.3, 16.2], d: 14.5, p: 0.95, a: 0.42 } });
 }
 let fly = null;
 const _sph = new THREE.Spherical();
@@ -634,7 +777,7 @@ function updateFly(dtR) {
   camera.position.setFromSpherical(_sph).add(controls.target);
   if (fly.t >= fly.dur) fly = null;
 }
-controls.addEventListener('start', () => { fly = null; if (ST.tour) setTour(false); });
+controls.addEventListener('start', () => { fly = null; if (ST.tour) setTour(false); if (intro) endIntro(true); });
 const _ray = new THREE.Ray(), _dir = new THREE.Vector3(), _hit = new THREE.Vector3(), _fp = new THREE.Vector3(), _side = new THREE.Vector3();
 function updateOcclusion(dtR) {
   const s = STOPS[ST.stop];
@@ -656,26 +799,72 @@ function updateOcclusion(dtR) {
 }
 const ring = new THREE.Mesh(new THREE.RingGeometry(0.965, 1, 72), new THREE.MeshBasicMaterial({ color: '#8a96ff', transparent: true, opacity: 0.5, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.position.y = 0.08; ring.visible = false; scene.add(ring);
-function selectStop(i, fromTour = false) {
+function focusStop(i) { // camera, ring and dock label only
   const n = STOPS.length; i = ((i % n) + n) % n;
   ST.stop = i;
   const s = STOPS[i];
   $('#stopIdx').textContent = s.type === 'overview' ? 'Overview' : `Stop ${i} of ${n - 1}`;
   $('#stopName').textContent = s.name;
   flyTo(s.view);
+  placeRing(s);
+}
+function selectStop(i, fromTour = false) {
+  if (intro) { intro = null; document.body.classList.remove('intro'); $('#caption').hidden = true; try { localStorage.setItem('ethtown.intro', '1'); } catch (e) { /* private mode */ } }
+  focusStop(i); i = ST.stop;
+  const s = STOPS[i];
   renderCard();
+  if (!fromTour) ST.tourT = 0;
+  syncHash();
+  if (s.type !== 'overview' && !ST.touched) { ST.touched = true; $('.plaque').classList.add('compact'); }
+}
+function placeRing(s) {
   ring.visible = s.type !== 'overview'; ring.userData.t = 0;
   if (ring.visible) {
     const sh = s.shop; let cx, cy, r;
     if (sh) { cx = sh.cx; cy = sh.cy; r = 2.35; }
     else if (s.type === 'station') { cx = 28; cy = 23; r = 6.6; }
     else if (s.type === 'vault') { cx = 44; cy = 14.6; r = 5.2; }
+    else if (s.type === 'builders') { cx = 27.65; cy = 30.2; r = 8.4; }
+    else if (s.type === 'mint') { cx = 34.5; cy = 16.0; r = 2.3; }
     else { cx = 43.1; cy = 22.8; r = 3.9; }
     ring.position.set(cx, 0.08, cy); ring.scale.setScalar(r);
   }
-  if (!fromTour) ST.tourT = 0;
-  syncHash();
-  if (s.type !== 'overview' && !ST.touched) { ST.touched = true; $('.plaque').classList.add('compact'); }
+}
+/* ---------- first visit: a short guided flight with captions ---------- */
+const INTRO = [
+  { stop: 'station', text: 'Every 12 seconds a train pulls in. Each one is a real Ethereum block.' },
+  { stop: 'builders', text: 'Across the tracks, builders compete to assemble each block. The winner’s workshop lights up.' },
+  { view: { t: [18.2, 0.6, 13.4], d: 46, p: 0.92, a: 0.3 }, name: 'The L2 shops', text: 'Layer-2 networks are the shops. Taller ones hold more value; bigger crowds mean more activity.' },
+  { stop: 'vault', text: 'At the Beacon Vault, ETH lines up to be staked. Gold sparks are rewards paid out to stakers.' },
+  { stop: 'burn', text: 'Every block burns its base fee. The tower next door counts all the ETH in existence.' },
+  { stop: 'mint', text: 'The Mint holds the dollar stablecoins that live on Ethereum.' },
+  { stop: 'overview', text: 'Click any building to learn what it is and where its numbers come from.' },
+];
+let intro = null;
+function introSeen() { try { return localStorage.getItem('ethtown.intro') === '1'; } catch (e) { return false; } }
+function startIntro() {
+  if (!STOPS.length) return;
+  setTour(false); closeAbout();
+  intro = { i: -1, t: 0 };
+  document.body.classList.add('intro'); $('#caption').hidden = false;
+  $('#capDots').innerHTML = INTRO.map(() => '<i></i>').join('');
+  nextIntro();
+}
+function nextIntro() {
+  intro.i++; intro.t = 0;
+  if (intro.i >= INTRO.length) { endIntro(false); return; }
+  const step = INTRO[intro.i], i = step.stop ? STOPS.findIndex((x) => x.type === step.stop) : -1;
+  if (i >= 0) focusStop(i); else { ST.stop = 0; ring.visible = false; flyTo(step.view); $('#stopIdx').textContent = 'Intro'; $('#stopName').textContent = step.name; }
+  $('#capText').textContent = step.text;
+  $('#capDots').querySelectorAll('i').forEach((d, k) => d.classList.toggle('on', k === intro.i));
+}
+function updateIntro(dtR) { if (intro && (intro.t += dtR) > (intro.i === INTRO.length - 1 ? 4.2 : 4.6)) nextIntro(); }
+function endIntro(keep) {
+  if (!intro) return;
+  intro = null;
+  document.body.classList.remove('intro'); $('#caption').hidden = true;
+  try { localStorage.setItem('ethtown.intro', '1'); } catch (e) { /* private mode */ }
+  selectStop(keep ? ST.stop : 0);
 }
 function setTour(on) {
   ST.tour = on; ST.tourT = 0; $('#tour').setAttribute('aria-pressed', String(on));
@@ -726,7 +915,7 @@ function layoutMobile() {
   const dock = document.querySelector('.dock');
   const hgt = dock ? dock.offsetHeight : 90;
   card.style.bottom = `calc(${hgt + 22}px + env(safe-area-inset-bottom, 0px))`;
-  card.style.maxHeight = `calc(100% - ${hgt + 150}px)`;
+  if (!SHEET.drag) setSheet(SHEET.state, false);
 }
 window.addEventListener('resize', () => layoutMobile());
 function setUiHidden(h) {
@@ -753,6 +942,8 @@ function bindUI() {
   $('#hideBtn').addEventListener('click', () => setUiHidden(true));
   $('#showUi').addEventListener('click', () => setUiHidden(false));
   $('#aboutBtn').addEventListener('click', openAbout);
+  $('#capSkip').addEventListener('click', () => endIntro(false));
+  $('#introBtn').addEventListener('click', () => startIntro());
   $('#aboutClose').addEventListener('click', closeAbout);
   $('#about').addEventListener('click', (e) => { if (e.target.id === 'about') closeAbout(); });
   $('#about').addEventListener('keydown', (e) => {
@@ -764,11 +955,24 @@ function bindUI() {
   });
   $('#keyToggle').addEventListener('click', () => { const k = $('#key'); const min = k.classList.toggle('min'); $('#keyToggle').textContent = min ? 'Show' : 'Hide'; $('#keyToggle').setAttribute('aria-expanded', String(!min)); });
   $('#goLive').addEventListener('click', () => { goLive(); });
-  card.addEventListener('click', (e) => { if (SMALL && e.target.closest('.card-head')) toggleCard(); });
+  card.addEventListener('click', (e) => {
+    const a = e.target.closest('[data-act]'), g = e.target.closest('[data-go]');
+    if (a) {
+      if (a.dataset.act === 'tour') setTour(true);
+      else if (a.dataset.act === 'about') openAbout();
+      else if (a.dataset.act === 'next') { setTour(false); selectStop(ST.stop + 1); }
+      else if (a.dataset.act === 'share') shareStop(a);
+      return;
+    }
+    if (g) { const i = STOPS.findIndex((x) => x.type === g.dataset.go); if (i >= 0) { setTour(false); selectStop(i); } return; }
+    if (SMALL && (e.target.closest('.card-head') || e.target.closest('.grab')) && performance.now() - SHEET.justDragged > 350) toggleCard();
+  });
+  bindSheet();
   card.addEventListener('keydown', (e) => { if (SMALL && (e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('card-head')) { e.preventDefault(); e.stopPropagation(); toggleCard(); } });
   window.addEventListener('keydown', (e) => {
     if (e.target.closest && e.target.closest('input,textarea')) return;
     if (!$('#about').hidden) { if (e.key === 'Escape') closeAbout(); return; }
+    if (intro && e.key !== 'Tab') { if (e.key === 'Escape' || e.key === ' ' || e.key.startsWith('Arrow')) { e.preventDefault(); endIntro(e.key.startsWith('Arrow')); } if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return; }
     if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('button,a,summary,[role="button"]')) return; // let focused controls work
     if (e.key === 'ArrowRight') { setTour(false); selectStop(ST.stop + 1); }
     else if (e.key === 'ArrowLeft') { setTour(false); selectStop(ST.stop - 1); }
@@ -806,6 +1010,8 @@ function applyTown(j) {
   if (j.l1) Object.assign(D.l1, j.l1);
   if (j.price) D.price = j.price;
   if (j.names) Object.assign(D.names, j.names);
+  if (j.builders && j.builders.shares && j.builders.shares.length) D.builders = j.builders;
+  if (j.payouts && j.payouts.blocks >= 100) D.payouts = j.payouts;
   ST.supply0 = D.supply.supply; ST.issuePerSlot = D.supply.issuedPerDay / 7200;
   // shops already built keep their lot and height; their cards pick up the new numbers
   for (const shop of SHOPS) {

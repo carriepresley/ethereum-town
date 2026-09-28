@@ -169,7 +169,7 @@ function updateVaultQueues(dt) {
 /* ---------------- ambient strollers ---------------- */
 const STROLL = [
   { y: 20.86, a: 0.4, b: WX - 0.4, w: 3 }, { y: 14.05, a: 0.4, b: 36.4, w: 2 }, { y: 7.0, a: 0.4, b: WX - 0.4, w: 2 },
-  { y: 30.15, a: 0.4, b: WX - 0.4, w: 2 }, { y: 11.05, a: 0.4, b: 12.1, w: 0.6 },
+  { y: 29.33, a: 0.4, b: WX - 0.4, w: 2 }, { y: 11.05, a: 0.4, b: 12.1, w: 0.6 },
 ];
 let strollCount = 0;
 function stroller(pre) {

@@ -1,7 +1,19 @@
 // Ethereum Town — slow-moving numbers: L2 rankings, staking queues, supply, stablecoins.
 // Cached at the edge for 15 minutes.
 const CANDIDATES = __CANDIDATES__; // [id, slug] pairs, busiest L2s at the last snapshot
-const NAMES = { base: 'Base', 'polygon-pos': 'Polygon PoS', optimism: 'OP Mainnet', fuel: 'Fuel', zksync2: 'ZKsync Era', worldchain: 'World Chain', lyra: 'Derive', roninnetwork: 'Ronin', taiko: 'Taiko', mantapacific: 'Manta Pacific', plumenetwork: 'Plume', lasernet: 'Lasernet', immutablezkevm: 'Immutable zkEVM', metis: 'Metis', galxegravity: 'Gravity' };
+const NAMES = { base: 'Base', 'polygon-pos': 'Polygon PoS', optimism: 'OP Mainnet', arbitrum: 'Arbitrum One', xlayer: 'X Layer', fuel: 'Fuel', zksync2: 'ZKsync Era', worldchain: 'World Chain', robinhood: 'Robinhood Chain', gnosis: 'Gnosis Chain', starknet: 'Starknet', megaeth: 'MegaETH', rise: 'RISE', lyra: 'Derive', roninnetwork: 'Ronin', taiko: 'Taiko', mantapacific: 'Manta Pacific', plumenetwork: 'Plume', lasernet: 'Lasernet', immutablezkevm: 'Immutable zkEVM', metis: 'Metis', galxegravity: 'Gravity' };
+// block builders sign blocks in extraData; the same grouping runs in the page
+const BUILDERS = [[/titan/, 'titan', 'Titan'], [/buildernet/, 'buildernet', 'BuilderNet'], [/quasar/, 'quasar', 'Quasar'], [/beaver/, 'beaver', 'beaverbuild'], [/rsync/, 'rsync', 'rsync'], [/bloxroute|blxr/, 'bloxroute', 'bloXroute'], [/btcs/, 'btcs', 'BTCS'], [/eureka/, 'eureka', 'Eureka'], [/bobthebuilder/, 'bob', 'bobTheBuilder'], [/bombora/, 'bombora', 'Bombora'], [/ultrasound/, 'ultrasound', 'Ultra Sound']];
+const BUILDER_NAMES = Object.fromEntries(BUILDERS.map((b) => [b[1], b[2]]).concat([['self', 'Built by validators'], ['untagged', 'No tag'], ['other', 'Other builders']]));
+function tagOf(extra) { let s = ''; for (let i = 2; i + 1 < (extra || '').length; i += 2) { const c = parseInt(extra.slice(i, i + 2), 16); if (c >= 32 && c < 127) s += String.fromCharCode(c); } return s.trim(); }
+function builderKey(tag) {
+  const t = (tag || '').toLowerCase();
+  if (!t) return 'untagged';
+  if (/^(geth|nethermind|besu|erigon|reth)/.test(t.replace(/[^a-z0-9]/g, ''))) return 'self';
+  for (const [rx, k] of BUILDERS) if (rx.test(t)) return k;
+  return 'other';
+}
+const tvsEx = (p) => ((p.tvs && p.tvs.breakdown && p.tvs.breakdown.total) || 0) - ((p.tvs && p.tvs.breakdown && p.tvs.breakdown.associated) || 0);
 const BLOBSCAN_KEYS = { base: 'base', arbitrum: 'arbitrum', world: 'worldchain', optimism: 'optimism', unichain: 'unichain', zksync: 'zksync2' };
 const SENDERS = __SENDERS__;
 const RPC = 'https://ethereum-rpc.publicnode.com';
@@ -21,24 +33,24 @@ function fakeExp(factor, num, den) { let i = 1, out = 0, acc = factor * den; whi
 
 module.exports = async (req, res) => {
   const out = { ok: true, asOf: new Date().toISOString() };
-  const [summary, vqHtml, gauge, burnSums, priceStats, supplyParts, stableChains, agg1y] = await Promise.all([
+  const [summary, vqHtml, gauge, burnSums, priceStats, supplyParts, stables, agg1y] = await Promise.all([
     settle(get('https://l2beat.com/api/scaling/summary', 9000)),
     settle(get('https://www.validatorqueue.com/', 9000, 'text')),
     settle(get('https://ultrasound.money/api/v2/fees/gauge-rates', 6000)),
     settle(get('https://ultrasound.money/api/v2/fees/burn-sums', 6000)),
     settle(get('https://ultrasound.money/api/v2/fees/eth-price-stats', 6000)),
     settle(get('https://ultrasound.money/api/v2/fees/supply-parts', 6000)),
-    settle(get('https://stablecoins.llama.fi/stablecoinchains', 8000)),
+    settle(get('https://stablecoins.llama.fi/stablecoins?includePrices=false', 9000)),
     settle(get('https://l2beat.com/api/scaling/activity?range=max', 9000)),
   ]);
 
-  // ---- L2 ranking by 7-day activity
+  // ---- the district: the 14 L2s with the best average of their activity rank and value-secured rank
   try {
     const projects = (summary && summary.projects) || {};
-    const byTvs = Object.entries(projects)
-      .filter(([, p]) => p.type === 'layer2' && !p.isArchived && p.hostChain === 'Ethereum')
-      .sort((a, b) => ((b[1].tvs && b[1].tvs.breakdown && b[1].tvs.breakdown.total) || 0) - ((a[1].tvs && a[1].tvs.breakdown && a[1].tvs.breakdown.total) || 0))
-      .slice(0, 14).map(([id, p]) => [id, p.slug]);
+    const elig = Object.entries(projects).filter(([, p]) => p.type === 'layer2' && !p.isArchived && p.hostChain === 'Ethereum');
+    const valueOrder = elig.sort((a, b) => tvsEx(b[1]) - tvsEx(a[1]));
+    const rv = Object.fromEntries(valueOrder.map(([id], i) => [id, i + 1]));
+    const byTvs = valueOrder.slice(0, 16).map(([id, p]) => [id, p.slug]);
     const cand = new Map([...CANDIDATES, ...byTvs].map(([id, slug]) => [id, slug]));
     const acts = await Promise.all([...cand.entries()].map(async ([id, slug]) => {
       const j = await settle(get('https://l2beat.com/api/scaling/activity/' + slug, 7000));
@@ -62,11 +74,15 @@ module.exports = async (req, res) => {
         da: da.includes('EthereumBlobs') ? 'blobs' : (da.some((d) => d.includes('EigenDA')) ? 'eigenda' : 'own'), daLabel: risks['Data Availability'] || '',
         txPerDay: Math.round(avg(rows.slice(-7).map((r) => r[1]))),
         spark: last30.map((r) => +(r[2] / 86400).toFixed(2)), sparkRange: [fmtD(last30[0][0]), fmtD(last30[last30.length - 1][0])],
-        blobsPerDay: 0, blobShare: 0,
+        blobsPerDay: 0, blobShare: 0, rv: rv[id],
+        risks: (p.risks || []).map((r) => [r.name, r.value, r.sentiment || '', (r.regular && r.regular.value) || null]),
       };
     }));
     const ranked = acts.filter(Boolean).sort((a, b) => b.uops - a.uops);
-    if (ranked.length >= 10) out.l2 = ranked.slice(0, 14);
+    ranked.forEach((s, i) => { s.ru = i + 1; });
+    const district = ranked.slice().sort((a, b) => (a.ru + a.rv) / 2 - (b.ru + b.rv) / 2 || a.ru - b.ru).slice(0, 14);
+    district.forEach((s, i) => { s.rank = i + 1; });
+    if (district.length >= 10) out.l2 = district;
     // aggregate activity
     const rows = (agg1y && agg1y.data && agg1y.data.chart && agg1y.data.chart.data || []).map((r) => [r[0], r[1] || 0, r[2] || 0]);
     if (rows.length > 380) {
@@ -75,7 +91,7 @@ module.exports = async (req, res) => {
       const yr = rows.filter((r) => r[0] >= last - 371 * 86400 && r[0] <= last - 365 * 86400);
       const now7 = avg(rows.slice(-7).map((r) => r[2])) / 86400;
       const lighter = ranked.find((r) => r.key === 'lighter');
-      if (yr.length >= 5) out.l2agg = { uops: Math.round(now7), uopsYearAgo: Math.round(avg(yr.map((r) => r[2])) / 86400), lighterShare: lighter ? +(lighter.uops / now7).toFixed(3) : undefined, lighterUops: lighter ? lighter.uops : undefined };
+      if (yr.length >= 5) out.l2agg = { uops: Math.round(now7), uopsYearAgo: Math.round(avg(yr.map((r) => r[2])) / 86400), lighterShare: lighter ? +(lighter.uops / now7).toFixed(3) : undefined, lighterUops: lighter ? lighter.uops : undefined, nL2: elig.length };
     }
   } catch (e) { out.l2err = String(e.message || e); }
 
@@ -112,6 +128,28 @@ module.exports = async (req, res) => {
     }
   } catch (e) { /* keep snapshot */ }
 
+  // ---- builders and validator payouts: the latest 200 blocks
+  try {
+    const head = parseInt((await get(RPC, 5000, 'json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] }) })).result, 16);
+    const chunks = [0, 1, 2, 3].map((c) => { const a = []; for (let n = head - 199 + c * 50; n < head - 199 + (c + 1) * 50; n++) a.push(n); return a; });
+    const res = await Promise.all(chunks.map((nums) => settle(get(RPC, 9000, 'json', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(nums.map((n) => ({ jsonrpc: '2.0', id: n, method: 'eth_getBlockByNumber', params: ['0x' + n.toString(16), false] }))) }))));
+    const bl = res.filter(Array.isArray).flat().map((r) => r && r.result).filter(Boolean);
+    if (bl.length >= 100) {
+      const count = {};
+      let skim = 0, principal = 0, principalBlocks = 0; const amts = [];
+      for (const b of bl) {
+        const k = builderKey(tagOf(b.extraData)); count[k] = (count[k] || 0) + 1;
+        let big = 0;
+        for (const w of b.withdrawals || []) { const a = parseInt(w.amount, 16) / 1e9; if (a < 1) { skim += a; amts.push(a); } else big += a; }
+        if (big > 0) { principal += big; principalBlocks++; }
+      }
+      const ts = bl.map((b) => parseInt(b.timestamp, 16));
+      amts.sort((a, b) => a - b);
+      out.builders = { blocks: bl.length, minutes: Math.round((Math.max(...ts) - Math.min(...ts)) / 60), shares: Object.entries(count).sort((a, b) => b[1] - a[1]).map(([k, c]) => [k, BUILDER_NAMES[k] || k, c]) };
+      out.payouts = { skimPerBlock: +(skim / bl.length).toFixed(4), skimPerDay: Math.round(skim / bl.length * 7200), perBlock: 16, principalBlocks, principalEth: +principal.toFixed(1), median: +(amts[Math.floor(amts.length / 2)] || 0).toFixed(4), blocks: bl.length };
+    }
+  } catch (e) { /* keep snapshot */ }
+
   // ---- staking queues
   try {
     const m = vqHtml && vqHtml.match(/const historical_data = (\[.*?\]);/s);
@@ -139,12 +177,15 @@ module.exports = async (req, res) => {
     if (priceStats && priceStats.usd) out.price = priceStats.usd;
   } catch (e) { /* keep snapshot */ }
 
-  // ---- stablecoins
+  // ---- stablecoins on Ethereum (USD-pegged): totals and the biggest issuers
   try {
-    if (Array.isArray(stableChains)) {
-      const tot = stableChains.reduce((s, c) => s + ((c.totalCirculatingUSD && c.totalCirculatingUSD.peggedUSD) || 0), 0);
-      const eth = stableChains.find((c) => c.name === 'Ethereum');
-      if (eth && tot) out.stables = { eth: eth.totalCirculatingUSD.peggedUSD, all: tot, share: +(eth.totalCirculatingUSD.peggedUSD / tot).toFixed(3) };
+    const assets = (stables && stables.peggedAssets) || [];
+    const onEth = (a) => (((a.chainCirculating || {}).Ethereum || {}).current || {}).peggedUSD || 0;
+    const all = assets.reduce((s, a) => s + (((a.circulating || {}).peggedUSD) || 0), 0);
+    const eth = assets.reduce((s, a) => s + onEth(a), 0);
+    if (all > 1e10 && eth > 1e9) {
+      const top = assets.slice().sort((a, b) => onEth(b) - onEth(a)).slice(0, 5).map((a) => [a.symbol, a.name, Math.round(onEth(a)), a.pegMechanism || '']);
+      out.stables = { eth: Math.round(eth), all: Math.round(all), share: +(eth / all).toFixed(4), top };
     }
   } catch (e) { /* keep snapshot */ }
 

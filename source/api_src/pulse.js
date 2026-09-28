@@ -41,6 +41,12 @@ function builderOf(extra) {
   s = s.trim();
   return (s.match(/[A-Za-z]/g) || []).length >= 3 ? s.slice(0, 40) : null;
 }
+// validator withdrawals in this block: [reward payouts, ETH they carried, ETH of stake withdrawn (1 ETH or more each)]
+function withdrawalsOf(ws) {
+  let n = 0, skim = 0, big = 0;
+  for (const w of ws || []) { const a = num(w.amount) / 1e9; if (a < 1) { n++; skim += a; } else big += a; }
+  return [n, +skim.toFixed(4), +big.toFixed(3)];
+}
 function keyFor(rollup, from) {
   if (rollup) return BLOBSCAN_KEYS[rollup] || rollup;
   return SENDERS[(from || '').toLowerCase()] || 'other';
@@ -51,12 +57,13 @@ module.exports = async (req, res) => {
     const head = num((await rpc({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] })).result);
     const nums = [head - 3, head - 2, head - 1, head];
     const batch = await rpc(nums.map((n) => ({ jsonrpc: '2.0', id: n, method: 'eth_getBlockByNumber', params: [hex(n), false] }))
-      .concat([{ jsonrpc: '2.0', id: 'fin', method: 'eth_getBlockByNumber', params: ['finalized', false] }, { jsonrpc: '2.0', id: 'fee', method: 'eth_feeHistory', params: ['0x5', 'latest', [50]] }]));
+      .concat([{ jsonrpc: '2.0', id: 'fin', method: 'eth_getBlockByNumber', params: ['finalized', false] }, { jsonrpc: '2.0', id: 'fee', method: 'eth_feeHistory', params: ['0xa', 'latest', [50]] }]));
     const byId = Object.fromEntries(batch.map((r) => [String(r.id), r.result]));
     const blocks = nums.map((n) => byId[String(n)]).filter(Boolean).sort((a, b) => num(a.number) - num(b.number));
     const fin = byId.fin ? { n: num(byId.fin.number), ts: num(byId.fin.timestamp) } : null;
     const tips = ((byId.fee && byId.fee.reward) || []).map((r) => num(r && r[0]) / 1e9).filter((x) => isFinite(x));
-    const tipGwei = tips.length ? +(tips.reduce((s, x) => s + x, 0) / tips.length).toFixed(4) : null;
+    tips.sort((a, b) => a - b); // median of the last 10 blocks' median tips: one odd block doesn't swing it
+    const tipGwei = tips.length ? +tips[Math.floor(tips.length / 2)].toFixed(4) : null;
 
     // blob posters: Blobscan's recent transactions carry rollup labels
     const posters = new Map(); // block number -> Map(key -> blobs)
@@ -99,6 +106,7 @@ module.exports = async (req, res) => {
       return {
         n, ts: num(b.timestamp), tx: (b.transactions || []).length, gasPct: +(gu / gl * 100).toFixed(1), gasLimit: gl,
         baseFee: +(bf / 1e9).toFixed(4), blobs, posters: list, burn: +(gu * bf / 1e18).toFixed(6), builder: builderOf(b.extraData),
+        wd: withdrawalsOf(b.withdrawals),
       };
     });
     res.setHeader('Cache-Control', 'public, s-maxage=8, stale-while-revalidate=30');
