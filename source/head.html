@@ -6,14 +6,14 @@
 <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@700;800;900&family=Doto:wght@700;900&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --ink:#131a2b; --ink-2:#48516b; --ink-3:#737c93;
+  --ink:#131a2b; --ink-2:#48516b; --ink-3:#5f6780;
   --panel:rgba(255,255,255,.94); --panel-solid:#ffffff; --line:rgba(19,26,43,.12); --line-2:rgba(19,26,43,.07);
   --chip:#eef1f7; --chip-ink:#27304a; --chip-on:#131a2b; --chip-on-ink:#ffffff;
   --accent:#4453d0; --accent-soft:rgba(68,83,208,.12);
   --gold:#b98319; --gold-soft:rgba(206,152,40,.16);
   --good:#177a47; --bad:#b83a3a;
   --surface:#dfe7ef;
-  --board:#0d111d; --board-2:#161c2d; --board-line:#262e46; --board-ink:#ffc55c; --board-dim:#9b8457; --board-hi:#fff1c9;
+  --board:#0d111d; --board-2:#161c2d; --board-line:#262e46; --board-ink:#ffc55c; --board-dim:#a88f5e; --board-hi:#fff1c9;
   --shadow:0 12px 32px rgba(14,20,40,.16),0 2px 6px rgba(14,20,40,.08);
   --r:14px;
   --display:"Big Shoulders Display","Arial Narrow","Roboto Condensed",Impact,sans-serif;
@@ -64,6 +64,9 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .plaque h1 svg{flex:none}
 .plaque p{margin:6px 0 0;color:var(--ink-2);font-size:13px;line-height:1.4;text-wrap:pretty}
 .plaque .asof{margin-top:6px;font-size:11.5px;color:var(--ink-3);letter-spacing:.02em}
+.plaque.compact{padding:10px 14px}
+.plaque.compact h1{font-size:28px}
+.plaque.compact p:not(.asof){display:none}
 
 /* ---------- departure board ---------- */
 .board{position:absolute;right:16px;top:calc(14px + env(safe-area-inset-top,0px));width:340px;background:var(--board);color:var(--board-ink);border-radius:12px;padding:10px 14px 11px;box-shadow:0 14px 34px rgba(5,8,18,.35),inset 0 0 0 1px var(--board-line);font-family:var(--ui)}
@@ -76,13 +79,13 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .board .bn b{font-family:var(--dot);font-weight:900;font-size:30px;line-height:1;letter-spacing:.02em;color:var(--board-hi);text-shadow:0 0 12px rgba(255,190,80,.35)}
 .board .grid{display:grid;grid-template-columns:repeat(4,auto);justify-content:space-between;gap:2px 10px;margin-top:4px}
 .board .grid div{display:flex;flex-direction:column}
-.board .grid span{font-size:9.5px;letter-spacing:.14em;color:var(--board-dim);font-weight:700}
+.board .grid span{font-size:10.5px;letter-spacing:.14em;color:var(--board-dim);font-weight:700}
 .board .grid b{font-family:var(--dot);font-weight:900;font-size:19px;color:var(--board-ink);line-height:1.1}
 .board .cargo{margin-top:7px;padding-top:7px;border-top:1px dashed var(--board-line);font-size:12px;color:#e9dcbd;line-height:1.35;min-height:32px}
-.board .cargo em{font-style:normal;color:var(--board-dim);letter-spacing:.1em;font-size:9.5px;font-weight:700;margin-right:6px}
+.board .cargo em{font-style:normal;color:var(--board-dim);letter-spacing:.1em;font-size:10.5px;font-weight:700;margin-right:6px}
 .board .cargo .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin:0 4px 0 2px;vertical-align:0;box-shadow:0 0 0 1px rgba(255,255,255,.25)}
 .board .sup{display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-top:7px;padding-top:7px;border-top:1px dashed var(--board-line)}
-.board .sup span{font-size:9.5px;letter-spacing:.14em;color:var(--board-dim);font-weight:700}
+.board .sup span{font-size:10.5px;letter-spacing:.14em;color:var(--board-dim);font-weight:700}
 .board .sup b{font-family:var(--dot);font-weight:900;font-size:18px;color:var(--board-hi);letter-spacing:.02em}
 
 /* ---------- info card ---------- */
@@ -121,7 +124,15 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .spark svg{display:block;width:100%;height:auto;overflow:visible}
 .spark .cap{display:flex;justify-content:space-between;font-size:10.5px;color:var(--ink-3);margin-top:2px;font-weight:600}
 .btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
-.btn{border:0;border-radius:999px;padding:7px 13px;font-weight:700;font-size:12.5px;background:var(--chip);color:var(--chip-ink)}
+.btn{border:0;border-radius:999px;padding:7px 13px;font-weight:700;font-size:12.5px;background:var(--chip);color:var(--chip-ink);display:inline-flex;align-items:center;gap:6px}
+.btn:hover{filter:brightness(.96)}
+.btnrow.end{margin-top:14px;padding-top:12px;border-top:1px solid var(--line-2)}
+details.more > summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3);border-radius:6px}
+details.more > summary::-webkit-details-marker{display:none}
+details.more > summary::after{content:"";flex:none;width:6px;height:6px;margin-right:5px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-2px) rotate(45deg);transition:transform .2s}
+details.more[open] > summary::after{transform:translateY(1px) rotate(225deg)}
+details.more > summary:hover{color:var(--ink)}
+details.more[open] > summary{margin-bottom:2px}
 .btn.primary{background:var(--chip-on);color:var(--chip-on-ink)}
 .list{list-style:none;margin:0;padding:0;display:grid;gap:9px}
 .list li{display:grid;grid-template-columns:18px 1fr;gap:8px;font-size:12.5px;line-height:1.45;color:var(--ink-2)}
@@ -167,6 +178,8 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 .seg button[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
 .pill{border:0;border-radius:999px;padding:8px 12px;font-weight:700;font-size:12px;background:var(--chip);color:var(--chip-ink);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .pill[aria-pressed="true"]{background:var(--chip-on);color:var(--chip-on-ink)}
+.pill.tour{background:var(--accent-soft);color:var(--accent)}
+.pill.tour[aria-pressed="true"]{background:var(--accent);color:#fff}
 .pill svg{flex:none}
 
 /* ---------- key ---------- */
@@ -252,6 +265,16 @@ button:focus-visible,a:focus-visible,[tabindex]:focus-visible{outline:2px solid 
 body.ready .loading{opacity:0;pointer-events:none}
 @media (prefers-reduced-motion:reduce){.loading svg{animation:none}}
 @media (max-width:760px){.lbl{font-size:10.5px}.lbl.on{font-size:11.5px}}
+@media (pointer:coarse){
+  .ib{width:40px;height:40px}
+  .seg button{min-width:36px;min-height:34px}
+  .pill{min-height:40px}
+  .btn{min-height:40px;padding:9px 14px}
+  .maplist button{min-height:40px}
+  details.more > summary{min-height:36px}
+  .key h4 button{min-height:32px;padding:0 4px}
+}
+@media (max-width:359px){.seg{display:none}}
 @media (max-width:760px){.card-head{cursor:pointer}}
 @media (prefers-reduced-motion:reduce){
   .board .bh .live i{animation:none}
@@ -283,7 +306,7 @@ body.ready .loading{opacity:0;pointer-events:none}
       <div class="sup"><span>ETH SUPPLY</span><b id="bSupply">--</b></div>
     </section>
 
-    <aside class="card" id="card" aria-live="polite"></aside>
+    <aside class="card" id="card" aria-label="About this place"></aside>
 
     <aside class="key" id="key" aria-label="How to read the town">
       <h4>How to read it <button id="keyToggle" aria-expanded="true">Hide</button></h4>
@@ -313,7 +336,7 @@ body.ready .loading{opacity:0;pointer-events:none}
           <button data-speed="10" aria-pressed="false" title="10× (3)">10×</button>
         </div>
         <button class="pill" id="sky" title="Time of day (N)" aria-label="Time of day: now"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="3" fill="currentColor"/><path d="M7 .8v1.6M7 11.6v1.6M.8 7h1.6M11.6 7h1.6M2.6 2.6l1.1 1.1M10.3 10.3l1.1 1.1M2.6 11.4l1.1-1.1M10.3 3.7l1.1-1.1" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span id="skyLabel">Now</span></button>
-        <button class="pill hide-sm" id="tour" aria-pressed="false" title="Auto tour (T)">Tour</button>
+        <button class="pill tour" id="tour" aria-pressed="false" title="Auto tour (T)"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 1.6v8.8L10.2 6z" fill="currentColor"/></svg>Tour</button>
         <button class="ib" id="aboutBtn" aria-label="About this town" title="About (?)"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.3 5.4a1.8 1.8 0 1 1 2.4 1.7c-.5.2-.7.5-.7 1v.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="7" cy="10.4" r=".9" fill="currentColor"/></svg></button>
         <button class="ib hide-sm" id="hideBtn" aria-label="Hide interface" title="Hide interface (H)"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2h4M2 2v4M14 2h-4M14 2v4M2 14h4M2 14v-4M14 14h-4M14 14v-4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       </div>
@@ -329,7 +352,7 @@ body.ready .loading{opacity:0;pointer-events:none}
       <h3>How to read it</h3>
       <table>
         <tr><td>Block train</td><td>One real block every 12 seconds. Coach windows light up with the block's transaction count. Each container on the flatcars is one blob, colored by the L2 that posted it.</td></tr>
-        <tr><td>L2 shops</td><td>The 14 busiest L2s by 7-day activity on L2BEAT. The busiest gets the lot closest to the station. Building height grows with the square root of value secured, and the crowd at the door with the square root of activity. Colors follow each network's brand; there are no logos.</td></tr>
+        <tr><td>L2 shops</td><td>The 14 busiest L2s by 7-day activity on L2BEAT. The busiest gets the lot closest to the station. Building height grows with the square root of value secured (not counting the chain's own token, such as ARB or OP), and the crowd at the door with the square root of activity. Colors follow each network's brand; there are no logos.</td></tr>
         <tr><td>Blob trucks</td><td>One truck for each L2 that posted blobs in that block, leaving from its shop. Batches from L2s outside the top 14, or from unlabeled posters, arrive from out of town.</td></tr>
         <tr><td>Couriers</td><td>L2s that publish their data somewhere other than Ethereum (EigenDA, or their own network) send small couriers instead of trucks. Their timing is illustrative.</td></tr>
         <tr><td>Beacon Vault</td><td>Staking. The people lined up outside are ETH waiting to be staked, about 20,000 ETH per figure; the line's length is the real entry queue, and the front walks in through the IN door at a sped-up pace. The short row by the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards, with a burst every epoch; they fly to the homes on the hill, which stand in for everyone who stakes.</td></tr>
@@ -338,7 +361,7 @@ body.ready .loading{opacity:0;pointer-events:none}
       <h3>Where the numbers come from</h3>
       <ul>
         <li>Blocks, gas, base fee and blob counts: a public Ethereum node (JSON-RPC). The replay uses blocks 26,074,816 to 26,075,715, and the station card links each block to <a href="https://etherscan.io" target="_blank" rel="noopener">Etherscan</a> so you can check it.</li>
-        <li>L2 activity (user operations per second), value secured and stages: <a href="https://l2beat.com/layer2s/activity" target="_blank" rel="noopener">L2BEAT</a>, 7-day averages. Projects L2BEAT lists under “Others” are shown as Not rated.</li>
+        <li>L2 activity (user operations per second), value secured and stages: <a href="https://l2beat.com/layer2s/activity" target="_blank" rel="noopener">L2BEAT</a>, 7-day averages. Value secured leaves out each chain's own token. Projects L2BEAT lists under “Others” are shown as Not rated.</li>
         <li>Blob attribution by L2: <a href="https://blobscan.com" target="_blank" rel="noopener">Blobscan</a>, matched to L2BEAT batch-poster addresses where unlabeled.</li>
         <li>Staking and queues: <a href="https://www.validatorqueue.com/" target="_blank" rel="noopener">validatorqueue.com</a> (beaconcha.in data).</li>
         <li>Issuance, burn and supply: <a href="https://ultrasound.money" target="_blank" rel="noopener">ultrasound.money</a>. Stablecoins: <a href="https://defillama.com/stablecoins/Ethereum" target="_blank" rel="noopener">DefiLlama</a>.</li>
@@ -347,7 +370,7 @@ body.ready .loading{opacity:0;pointer-events:none}
       <h3>What's illustrative</h3>
       <p>People, cars, courier timing and the exact truck routes are decoration scaled from the data. Numbers in the cards are real and dated, and estimates are labeled as estimates. Nothing here is investment advice.</p>
       <h3>Keys</h3>
-      <p><kbd>←</kbd> <kbd>→</kbd> stops · <kbd>Space</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed · <kbd>N</kbd> time of day · <kbd>T</kbd> tour · <kbd>H</kbd> hide interface. Drag to pan, right-drag or two fingers to rotate, scroll or pinch to zoom, and click any building for its card.</p>
+      <p><kbd>←</kbd> <kbd>→</kbd> stops · <kbd>Space</kbd> pause · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> speed · <kbd>N</kbd> time of day · <kbd>T</kbd> tour · <kbd>H</kbd> hide interface. Drag to pan, right-drag or two fingers to rotate, scroll or pinch to zoom, and click any building for its card. Every place has its own link (for example <a href="https://ethereum-town.vercel.app/#base" target="_blank" rel="noopener">#base</a> or #vault); use Share in any card to copy it.</p>
       <p style="margin-top:14px;font-size:12px;color:var(--ink-3)">The idea of a data-sized town was sparked by Ryan Sael's Token Town.</p>
     </div>
   </div>

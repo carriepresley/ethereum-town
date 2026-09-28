@@ -8,13 +8,15 @@ Every train that pulls into Mainnet Station is a real block. The 14 busiest laye
 
 | Place | What it shows |
 | --- | --- |
-| Mainnet Station | Ethereum's base layer. One real block every 12 seconds; coach windows light up with its transaction count, and each container is one blob, colored by the L2 that posted it. |
-| L2 shops | The 14 busiest L2s by 7-day activity on L2BEAT. Height grows with the square root of value secured, the crowd with the square root of activity. Colors follow each network's brand (no logos). Stage 1 shops fly a green flag; L2BEAT's "Others" are shown as Not rated. |
+| Mainnet Station | Ethereum's base layer. One real block every 12 seconds; coach windows light up with its transaction count, and each container is one blob, colored by the L2 that posted it. In live mode the card also shows the block's builder tag, how far behind finality is, and what a transfer or swap costs right now. |
+| L2 shops | The 14 busiest L2s by 7-day activity on L2BEAT. Height grows with the square root of value secured (not counting the chain's own token, such as ARB or OP), the crowd with the square root of activity. Colors follow each network's brand (no logos). Stage 1 shops fly a green flag; L2BEAT's "Others" are shown as Not rated. |
 | Trucks and couriers | L2s that post data to Ethereum send trucks with their real batches; those that keep data elsewhere (EigenDA, their own network) send couriers. |
 | Beacon Vault | Staking. The people lined up outside are ETH waiting to be staked (about 20,000 ETH per figure); the short row at the OUT door is the exit queue. Gold sparks leaving the vault are staking rewards, flying to the homes on the hill, which stand in for everyone who stakes. |
 | The Burn | The base fee burned by each block, and a running count of total ETH supply. |
 
 People, cars, courier timing and truck routes are decoration scaled from the data. Numbers in the cards are real and dated; estimates are labeled.
+
+Every place has its own link, such as [#base](https://ethereum-town.vercel.app/#base) or [#vault](https://ethereum-town.vercel.app/#vault), and the Share button in each card copies it. Add `night`, `dusk`, `dawn` or `day` to set the time of day (for example `#night-station`).
 
 ## Data sources
 
@@ -30,6 +32,7 @@ People, cars, courier timing and truck routes are decoration scaled from the dat
 - `api/pulse.js` returns the latest mainnet blocks and which L2s posted blobs in them (cached at the edge for about 8 seconds).
 - `api/town.js` returns L2 rankings, staking queues, supply, burn and stablecoins (cached for 15 minutes).
 - If the functions are unavailable, the page replays three hours of real blocks from the snapshot.
+- Phones and weaker machines render fewer pixels without shadows from people and cars; standard-density desktop screens get multisampled antialiasing. If the first seconds run slowly, the page steps quality down once.
 
 No build step, environment variables, accounts, wallets or analytics. Vercel serves the root folder as-is.
 

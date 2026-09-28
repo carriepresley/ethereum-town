@@ -11,7 +11,7 @@ const pBodyGeo = new THREE.CapsuleGeometry(0.078, 0.2, 2, 7); pBodyGeo.translate
 const pHeadGeo = new THREE.SphereGeometry(0.068, 8, 6); pHeadGeo.translate(0, 0.418, 0);
 const pBody = new THREE.InstancedMesh(pBodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.85 }), MAXP);
 const pHead = new THREE.InstancedMesh(pHeadGeo, new THREE.MeshStandardMaterial({ roughness: 0.7 }), MAXP);
-for (const m of [pBody, pHead]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = true; m.frustumCulled = false; scene.add(m); }
+for (const m of [pBody, pHead]) { m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = !LOW; m.frustumCulled = false; scene.add(m); }
 const CLOTHES = ['#e4572e', '#2e4a7d', '#f3a712', '#6a994e', '#4d7ea8', '#e8e3db', '#8d5a97', '#2e86ab', '#d1495b', '#3a3f4b', '#f6ae2d', '#7b8cde', '#c97b63', '#1f7a6d', '#b8b8c0', '#ef8a62'];
 const SKIN = ['#f1c9a5', '#e0ac85', '#c68863', '#9b6a47', '#6b4630', '#f5d6bc'];
 const people = [];
@@ -183,7 +183,8 @@ function stroller(pre) {
 
 /* ---------------- vehicles ---------------- */
 const MAXV = 90;
-function vMesh(geo, mat, cast = true) { const m = new THREE.InstancedMesh(geo, mat, MAXV); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = cast; m.frustumCulled = false; for (let i = 0; i < MAXV; i++) m.setMatrixAt(i, ZERO_M); scene.add(m); return m; }
+const ACTOR_MESHES = [pBody, pHead]; // people and vehicles: their shadows are the first thing to go on slow devices
+function vMesh(geo, mat, cast = true) { const m = new THREE.InstancedMesh(geo, mat, MAXV); m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.castShadow = cast && !LOW; m.frustumCulled = false; for (let i = 0; i < MAXV; i++) m.setMatrixAt(i, ZERO_M); scene.add(m); ACTOR_MESHES.push(m); return m; }
 const gCarBody = new THREE.BoxGeometry(1.0, 0.28, 0.5); gCarBody.translate(0, 0.25, 0);
 const gCarTop = new THREE.BoxGeometry(0.56, 0.22, 0.46); gCarTop.translate(-0.06, 0.5, 0);
 const gCab = new THREE.BoxGeometry(0.46, 0.58, 0.64); gCab.translate(0.64, 0.41, 0);

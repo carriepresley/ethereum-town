@@ -170,8 +170,12 @@ function updateToasts(dtR) {
     if (t.t > 2.8) { t.el.remove(); TOASTS.splice(i, 1); continue; }
     _pv.copy(t.v); _pv.y += t.t * 0.5; _pv.project(camera);
     if (_pv.z > 1) { t.el.style.opacity = 0; continue; }
-    t.el.style.opacity = String(Math.min(1, t.t * 4) * (1 - smooth((t.t - 2.1) / 0.7)));
-    t.el.style.transform = `translate(${((_pv.x + 1) / 2 * w).toFixed(1)}px, ${((1 - _pv.y) / 2 * h).toFixed(1)}px) translate(-50%, -50%)`;
+    if (!t.w) { t.w = t.el.offsetWidth || 120; t.h = t.el.offsetHeight || 22; }
+    const x = clamp((_pv.x + 1) / 2 * w, t.w / 2 + 6, w - t.w / 2 - 6), y = (1 - _pv.y) / 2 * h;
+    const r = [x - t.w / 2, y - t.h / 2, x + t.w / 2, y + t.h / 2];
+    const covered = y < t.h || y > h - t.h / 2 || panelRects.some((p) => r[0] < p[2] && r[2] > p[0] && r[1] < p[3] && r[3] > p[1]);
+    t.el.style.opacity = covered ? '0' : String(Math.min(1, t.t * 4) * (1 - smooth((t.t - 2.1) / 0.7)));
+    t.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -50%)`;
   }
 }
 function nameOf(key) { return (D.names && D.names[key]) || (SHOPS.find((s) => s.key === key) || {}).name || key; }
@@ -261,6 +265,7 @@ const FLAG_ICON = '<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="
 const DISH_ICON = '<svg width="11" height="11" viewBox="0 0 11 11" aria-hidden="true"><path d="M1.5 4.5a5 5 0 0 0 5 5z" fill="currentColor"/><path d="M4 7 8 3M8 3l1.5-1.5" stroke="currentColor" stroke-width="1.3"/></svg>';
 const TRUCK_ICON = '<svg width="13" height="11" viewBox="0 0 13 11" aria-hidden="true"><rect x=".5" y="2" width="8" height="6" rx="1" fill="currentColor"/><rect x="8.5" y="4" width="4" height="4" rx="1" fill="currentColor" opacity=".6"/></svg>';
 const EXT_ICON = '<svg class="ext" width="9" height="9" viewBox="0 0 10 10" aria-hidden="true"><path d="M3.8 1.6h4.6v4.6M8.2 1.8 1.8 8.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const SHARE_ICON = '<svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1.2v6.6M3.4 3.6 6 1.2l2.6 2.4M2 6.4v3.4c0 .5.4.9.9.9h6.2c.5 0 .9-.4.9-.9V6.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function ext(url, label) { return `<a href="${url}" target="_blank" rel="noopener">${label}${EXT_ICON}</a>`; }
 function head(eyebrow, title, sub, sw) {
   return `<div class="card-head"><div class="eyebrow">${sw ? `<span class="sw" style="background:${sw}"></span>` : ''}${eyebrow}</div><h2>${title}</h2>${sub ? `<p class="sub">${sub}</p>` : ''}</div>`;
@@ -271,7 +276,17 @@ function seeList(items, title = 'What you’re seeing') { return block(title, `<
 function sourceList(items, foot = '') {
   return block('Sources &amp; further reading', `<ul class="links">${items.filter(Boolean).map(([label, url, what]) => `<li>${ext(url, label)}${what ? `<span>${what}</span>` : ''}</li>`).join('')}</ul>${foot ? `<p class="foot">${foot}</p>` : ''}`, 'srcs');
 }
-function hoursLabel(days) { const h = Math.max(1, Math.round(days * 24)); return h === 1 ? 'hour' : h + ' hours'; }
+function esc(t) { return String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
+function hoursLabel(days) { // "last 40 minutes", "last hour", "last 3 hours"
+  const m = Math.max(1, Math.round(days * 1440));
+  if (m < 55) return m + ' minutes';
+  const h = Math.max(1, Math.round(days * 24)); return h === 1 ? 'hour' : h + ' hours';
+}
+function dollars(v) { return v < 0.01 ? 'under 1¢' : v < 1 ? Math.round(v * 100) + '¢' : v < 100 ? '$' + v.toFixed(2) : '$' + fmt(v, 0); }
+function txCost(gas, b) { // what a transaction of this size costs at a block's base fee (+ the typical tip, when live)
+  const gwei = b.baseFee + (ST.mode === 'live' && D.tipGwei != null ? D.tipGwei : 0);
+  return gas * gwei * 1e-9 * D.price;
+}
 function liveNote() { return ST.mode === 'live' ? 'Trains are arriving live from Ethereum mainnet.' : `Trains replay real blocks from ${D.replay.from}–${D.replay.to} UTC on Sep 28, 2026.`; }
 function asOf() { return ST.mode === 'live' && D.liveAsOf ? `Refreshed ${D.liveAsOf}` : `Snapshot ${D.asOfLabel}`; }
 
@@ -298,11 +313,13 @@ const SRC = {
   eip4844: ['EIP-4844', 'https://eips.ethereum.org/EIPS/eip-4844', 'blobs'],
   eip7918: ['EIP-7918', 'https://eips.ethereum.org/EIPS/eip-7918', 'the blob fee floor'],
   eip7251: ['EIP-7251', 'https://eips.ethereum.org/EIPS/eip-7251', 'validator consolidations'],
+  eoMev: ['ethereum.org · MEV', 'https://ethereum.org/developers/docs/mev/', 'block builders, relays and MEV-Boost'],
+  eoFinality: ['ethereum.org · Finality', 'https://ethereum.org/developers/docs/consensus-mechanisms/pos/#finality', 'when a block can no longer change'],
 };
 
 /* ---------- L2 background, paraphrased from each project's L2BEAT page ---------- */
 const L2_ABOUT = {
-  lighter: 'An app-specific ZK rollup built for trading. It runs the Lighter exchange, and zero-knowledge proofs of its results are checked on Ethereum.',
+  lighter: 'An app-specific ZK rollup built for trading. It runs the Lighter exchange, and zero-knowledge proofs of its results are checked on Ethereum. Most of its activity count is trading actions such as placing and canceling orders.',
   rise: 'A low-latency chain on the OP Stack built for real-time trading through its RISEx exchange. It posts its data to EigenDA.',
   base: 'Coinbase’s L2: a general-purpose optimistic rollup built with the OP Stack.',
   robinhood: 'Robinhood’s L2, built with Arbitrum technology (Orbit) and focused on tokenized stocks, ETFs and other real-world assets. Its public mainnet opened on July 1, 2026.',
@@ -345,7 +362,7 @@ function overviewCard() {
   const nBlob = SHOPS.filter((x) => x.da === 'blobs').length, nOff = SHOPS.length - nBlob;
   const lighter = D.l2.find((x) => x.key === 'lighter');
   const caveat = !!(lighter && a.uopsYearAgo) && Date.now() < Date.UTC(2026, 9, 9); // until the year-ago week includes Lighter
-  const exL = caveat ? (a.uops - (a.lighterUops || lighter.uops)) / a.uopsYearAgo : 0;
+  const exL = caveat ? (a.uops - (a.lighterUops || lighter.uops)) / a.uopsYearAgo : 0; // like-for-like: L2BEAT has no year-ago Lighter figure
   const top = [...D.l2].sort((x, y) => y.uops - x.uops)[0];
   const two = D.blobShares.filter((x) => x.key !== 'other').slice(0, 2);
   const blobWin = D.blobLive ? `in the last ${hoursLabel(D.l1.blobSourceDays)}` : 'in the 24 hours to Sep 28';
@@ -362,30 +379,47 @@ function overviewCard() {
     `<b>Blob space</b> is running at about ${Math.round(l1.blobsPerBlock / l1.blobTarget * 100)}% of its target, so L2s pay close to the minimum for data.`,
     `<b>${compact(s.entryQ, 2)} ETH</b> is waiting to start staking, about a ${Math.round(s.entryWait)}-day wait.`,
     `<b>${fmt(sp.issuedPerDay, 0)} ETH</b> is issued and <b>${fmt(sp.burnedPerDay, 0)} ETH</b> burned a day (7-day average), so supply grows about ${sp.growthPct.toFixed(2)}% a year.`,
-    `<b>$${(st.eth / 1e9).toFixed(0)}B</b> in stablecoins sits on Ethereum mainnet, ${Math.round(st.share * 100)}% of all stablecoins.`,
+    `<b>$${(st.eth / 1e9).toFixed(0)}B</b> in dollar stablecoins sits on Ethereum mainnet, ${Math.round(st.share * 100)}% of all dollar stablecoins.`,
   ];
   return head('Welcome to', 'Ethereum Town', `A living miniature of the Ethereum network, built from real data. ${liveNote()} Click any building to see what it is and where its numbers come from.`)
-    + `<div class="stats">${stat('L1 transactions a day', compact(l1.txPerDay, 2), delta(l1.txPerDay / l1.txPerDayYearAgo - 1, 'up', 'vs last year'))}
-      ${stat('L2 activity', fmt(a.uops) + '<small>ops/s</small>', `${(a.uops / a.uopsYearAgo).toFixed(1)}× a year ago${caveat ? '*' : ''}`)}
+    + `<div class="stats">${stat('L1 transactions a day', compact(l1.txPerDay, 2), txTrend(l1))}
+      ${stat('L2 activity', fmt(a.uops) + '<small>ops/s</small>', caveat ? `${exL.toFixed(1)}× a year ago, not counting Lighter*` : `${(a.uops / a.uopsYearAgo).toFixed(1)}× a year ago`)}
       ${stat('ETH staked', s.pct.toFixed(1) + '%', '≈' + compact(s.staked, 1) + ' ETH')}
       ${stat('Supply growth', '+' + sp.growthPct.toFixed(2) + '%<small>/yr</small>', 'Issuance outpaces the burn')}</div>`
-    + (caveat ? `<p class="foot">* About ${exL.toFixed(1)}× without Lighter, which L2BEAT has only counted since ${a.lighterSince || 'Oct 2, 2025'}.</p>` : '')
+    + (caveat ? `<p class="foot">* ${(a.uops / a.uopsYearAgo).toFixed(1)}× counting Lighter, which L2BEAT has only tracked since ${a.lighterSince || 'Oct 2, 2025'}, so the year-ago figure has none of its activity.</p>` : '')
     + block('Map of the town', `<ul class="maplist">${map.map(([go, c, name, text]) => go
       ? `<li><button type="button" data-go="${go}"><i style="background:${c}"></i><span><b>${name}</b> ${text}</span></button></li>`
       : `<li><div><i style="background:${c}"></i><span><b>${name}</b> ${text}</span></div></li>`).join('')}</ul>`)
     + seeList(facts, 'Notable today')
     + `<div class="btnrow"><button class="btn primary" data-act="tour">Start the tour</button><button class="btn" data-act="about">About the data</button></div>`
-    + sourceList([SRC.l2beat, SRC.blobscan, SRC.vq, SRC.usm, SRC.llama, SRC.rpc], asOf() + '.');
+    + sourceList([SRC.l2beat, SRC.blobscan, SRC.vq, SRC.usm, SRC.llama, SRC.rpc], asOf() + '.')
+    + cardEnd();
+}
+// a year-on-year change is only like-for-like for the 7-day snapshot; live numbers are a 24-hour sample
+function txTrend(l1) { return l1.window === '24h' ? 'Sampled over the last 24 hours' : delta(l1.txPerDay / l1.txPerDayYearAgo - 1, 'up', 'vs last year'); }
+function cardEnd() {
+  const n = STOPS.length, nx = STOPS[(ST.stop + 1) % n];
+  return `<div class="btnrow end"><button class="btn primary" data-act="next">${nx.type === 'overview' ? 'Back to the overview' : 'Next: ' + nx.name}<span aria-hidden="true"> →</span></button><button class="btn" data-act="share">${SHARE_ICON}Share</button></div>`;
 }
 
 /* ---------- Mainnet Station ---------- */
+// builders sign most blocks in extraData; an execution client's own tag means the proposer built the block itself
+function builderText(tag) {
+  const own = /^(geth|reth|nethermind|besu|erigon)/i.exec(tag.replace(/[^a-z0-9 .()/_-]/gi, ''));
+  return own ? `Built by the proposer’s own node software (${esc(own[1][0].toUpperCase() + own[1].slice(1).toLowerCase())})` : `Builder’s tag: <b>${esc(tag)}</b>`;
+}
 function stationNowHTML() {
   const b = boardBlock; if (!b) return '<div class="block" id="stationNow" hidden></div>'; // filled when the first train arrives
-  return `<div class="block" id="stationNow"><h3>Now boarding</h3><div class="stats">
+  const live = ST.mode === 'live' && b.live, tip = live && D.tipGwei != null;
+  const fin = live && D.finalized && D.finalized.n && D.finalized.n < b.n ? D.finalized : null;
+  return `<div class="block" id="stationNow"><h3>Now boarding${live ? ' · live' : ''}</h3><div class="stats">
     ${stat('Block', fmt(b.n), new Date(b.ts * 1000).toISOString().slice(11, 19) + ' UTC')}
     ${stat('Transactions', fmt(b.tx), Math.round(b.gasPct) + '% of the gas limit')}
     ${stat('Blobs aboard', b.blobs + '<small>of ' + D.l1.blobMax + ' max</small>', (b.posters || []).slice(0, 2).map((p) => nameOf(p[0]) + ' ' + p[1]).join(' · ') || 'None this block')}
-    ${stat('Burned by this block', b.burn.toFixed(4) + '<small>ETH</small>', b.baseFee.toFixed(3) + ' gwei base fee')}</div>
+    ${stat('Burned by this block', b.burn.toFixed(4) + '<small>ETH</small>', b.baseFee.toFixed(3) + ' gwei base fee')}
+    ${stat('Sending ETH costs', '≈' + dollars(txCost(21000, b)), `A token swap ≈${dollars(txCost(150000, b))}${tip ? '' : ', before tips'}`)}
+    ${fin ? stat('Final up to block', fmt(fin.n), `≈${Math.max(1, Math.round((b.ts - fin.ts) / 60))} min behind this one`) : ''}</div>
+    ${live && b.builder ? `<p class="foot">${builderText(b.builder)}${/^Built by/.test(builderText(b.builder)) ? '' : ' (self-reported in the block)'}</p>` : ''}
     <p class="foot">${ext(`https://etherscan.io/block/${b.n}`, `Look up block ${fmt(b.n)} on Etherscan`)}</p></div>`;
 }
 function refreshStationNow() { const el = document.getElementById('stationNow'); if (el) el.outerHTML = stationNowHTML(); }
@@ -395,13 +429,15 @@ function stationCard() {
   const top = D.blobShares.slice(0, 9);
   const maxShare = Math.max(...top.map((s) => s.share));
   const gl = Math.round((l1.gasLimit || 60e6) / 1e6);
+  const perBlob = l1.blobsPerBlock > 0 ? l1.blobFees7dEth / (l1.blobsPerBlock * 7200 * 7) * D.price : 0; // average blob fee, in dollars
+  const live = ST.mode === 'live';
   return head('Layer 1 · Execution', 'Mainnet Station', 'Ethereum’s base layer. Every 12 seconds a validator, chosen at random in proportion to its stake, proposes a block of transactions, and tens of thousands of others vote (attest) that it is valid.', '#4453d0')
     + stationNowHTML()
     + `<div class="block"><h3>${l1.window === '24h' ? 'The last 24 hours' : 'The week to Sep 28'}</h3><div class="stats">
-      ${stat('Transactions a day', compact(l1.txPerDay, 2), delta(l1.txPerDay / l1.txPerDayYearAgo - 1, 'up', 'vs last year'))}
+      ${stat('Transactions a day', compact(l1.txPerDay, 2), txTrend(l1))}
       ${stat('Gas limit', gl + 'M', 'Was 45M a year ago · ~' + Math.round(l1.fullness * 100) + '% used')}
       ${stat('Blob freight', l1.blobsPerBlock.toFixed(1) + '<small>per block</small>', `Target ${l1.blobTarget} · max ${l1.blobMax} · ~${Math.round(l1.blobsPerBlock / l1.blobTarget * 100)}% of target`)}
-      ${stat('Blob fees paid', '≈' + l1.blobFees7dEth.toFixed(2) + '<small>ETH / 7 days</small>', l1.window === '24h' ? 'At the last day’s pace' : 'L2 data is nearly free right now')}</div></div>`
+      ${stat('Blob fees paid', '≈' + l1.blobFees7dEth.toFixed(2) + '<small>ETH / 7 days</small>', `≈${usd(l1.blobFees7dEth * D.price)}${perBlob ? ', about ' + dollars(perBlob) + ' a blob' : ''}${l1.window === '24h' ? ', at the last day’s pace' : ''}`)}</div></div>`
     + seeList([
       '<b>Each train is one real block.</b> Its coaches light up with the block’s transaction count, and more passengers board when it carries more.',
       '<b>Each container is one blob</b>, colored by the L2 that posted it. Trucks bring them from the shops; batches from other networks arrive from out of town.',
@@ -411,8 +447,13 @@ function stationCard() {
     + `<div class="block"><h3>Who ships blobs · ${D.blobLive ? 'last ' + hoursLabel(l1.blobSourceDays) : '24 hours to Sep 28'}</h3><div class="bars">${top.map((s) => `<span class="n"><i style="background:${containerColor(s.key)}"></i>${s.name}</span><span class="t" style="width:${(s.share / maxShare * 100).toFixed(1)}%"></span><span class="p">${(s.share * 100).toFixed(1)}%</span>`).join('')}</div></div>`
     + block('Why it matters', paras(
       `Mainnet is where everything settles: L2s post their data and state commitments (and, for ZK rollups, proofs) here, and the base fee paid by every transaction is burned. A gas limit, now ${gl} million, caps how much work fits in each block.`,
-      `<b>Blobs</b> are Ethereum’s cheap data lane for L2s, added in March 2024 (EIP-4844). The network keeps blob data for about 18 days, long enough for anyone to check an L2’s work, instead of storing it forever. Each block can carry up to ${l1.blobMax} blobs, with a target of ${l1.blobTarget}. While usage stays below the target, the blob fee sits near a floor that moves with regular gas prices (EIP-7918, from the Fusaka upgrade). Blob fees are burned too.`))
-    + sourceList([SRC.rpc, SRC.blobscan, SRC.eoBlocks, SRC.eoDank, SRC.eip4844, SRC.eip7918], `Blob attribution uses Blobscan labels, matched to L2BEAT’s list of batch-poster addresses where unlabeled. ${asOf()}.`);
+      `<b>Blobs</b> are Ethereum’s cheap data lane for L2s, added in March 2024 (EIP-4844). The network keeps blob data for about 18 days, long enough for anyone to check an L2’s work, instead of storing it forever. Each block can carry up to ${l1.blobMax} blobs, with a target of ${l1.blobTarget}. While usage stays below the target, the blob fee sits near a floor that moves with regular gas prices (EIP-7918, from the Fusaka upgrade). Blob fees are burned too.`,
+      `<b>Finality.</b> A block becomes final after two to three epochs (about 13 to 19 minutes), once validators holding at least two-thirds of all staked ETH have voted for it. Reversing a final block would cost an attacker at least a third of all staked ETH, about ${compact(D.staking.staked / 3, 1)} ETH, which the protocol would destroy (slash).`))
+    + `<details class="block more"><summary>Who builds the blocks, and what they cost</summary>${paras(
+      'Most validators don’t assemble their own blocks. Through MEV-Boost, specialized builders compete to put together the most valuable block, and the validator whose turn it is takes the best bid. Builders usually sign the block’s extra-data field, which is where the builder’s tag comes from; it is self-reported.',
+      `<b>Costs are estimates.</b> Sending ETH uses 21,000 gas and a typical token swap about 150,000, priced at the block’s base fee${live ? ' plus the median tip of the last few blocks' : ' before tips'}, with ETH at ${usd(D.price)}. The blob cost is the average fee per blob over the period.`)}</details>`
+    + sourceList([SRC.rpc, SRC.blobscan, SRC.eoBlocks, SRC.eoFinality, SRC.eoMev, SRC.eoDank, SRC.eip4844, SRC.eip7918], `Blob attribution uses Blobscan labels, matched to L2BEAT’s list of batch-poster addresses where unlabeled. ${asOf()}.`)
+    + cardEnd();
 }
 
 /* ---------- L2 shops ---------- */
@@ -430,25 +471,27 @@ function l2Card(shop) {
   const stageText = rated ? STAGE_TEXT[stage] || ''
     : `<b>Not rated.</b> L2BEAT lists it under “Others”, its group for L2s that lack a working proof system or enough data-availability guarantees, so it gets no stage.${why ? ' Its L2BEAT page notes that ' + why + '.' : ''}`;
   const about = L2_ABOUT[s.key] || `${s.category}${s.stack && s.stack !== 'Independent' ? ' built on ' + s.stack : ''}.`;
+  const withToken = s.tvsTotal && s.ownToken && s.tvsTotal > s.tvs * 1.05; // its own token is a real part of the total
   return head(`L2 · #${s.rank} by activity`, s.name, about, s.brand.id)
     + `<div class="tags">${stageTag}${da}</div>`
     + `<div class="stats">${stat('Activity, 7-day avg', fmt(s.uops, s.uops < 10 ? 1 : 0) + '<small>ops/s</small>', delta(s.wow, 'up', 'vs prior week'))}
-      ${stat('Value secured', usd(s.tvs), delta(s.tvs7d, 'up', 'in 7 days'))}
+      ${stat('Value secured', usd(s.tvs), withToken ? `${usd(s.tvsTotal)} with its ${esc(s.ownToken)} token` : delta(s.tvs7d, 'up', 'in 7 days'))}
       ${stat('Transactions a day', compact(s.txPerDay, 1))}
       ${dataStat}</div>`
     + seeList([
-      '<b>Crowd and height:</b> the crowd at its door grows with the square root of its activity, and the building with the square root of value secured.',
+      '<b>Crowd and height:</b> the crowd at its door grows with the square root of its activity, and the building with the square root of value secured (not counting its own token).',
       s.da === 'blobs' ? '<b>Trucks</b> in its colors carry its real blob batches to the station, block by block.' : '<b>Couriers</b> leave its door instead of trucks, because its data doesn’t go to Ethereum. Their timing is illustrative; the dish on the roof marks the same thing.',
       stage === 'Stage 1' || stage === 'Stage 2' ? '<b>The green flag</b> on the roof marks Stage 1 or higher on L2BEAT.' : '',
       sibs.length ? `<b>Same code base:</b> ${sibs.length === 1 ? 'one other shop here runs' : sibs.length + ' other shops here run'} the ${fam} too: ${sibs.map((x) => x.name).join(', ')}.` : '',
     ])
     + (sp ? `<div class="block"><h3>Daily activity, last 30 days</h3>${sp}</div>` : '')
     + block('How it’s secured', paras(stageText, `<b>Data.</b> ${DA_TEXT[s.da] || ''}`, 'Stages measure how much a chain still depends on its operators, not how safe it is overall.'))
-    + block('What’s an L2?', paras(
+    + `<details class="block more"><summary>What’s an L2?</summary>${paras(
       'An L2 runs its own network and settles to Ethereum: it batches many transactions, then posts its data (or a commitment to it) and a proof or claim about the result to mainnet. That lets it handle far more activity at lower cost, while leaning on Ethereum for security to a degree that depends on its design.',
-      '<b>Activity</b> is L2BEAT’s user operations per second (UOPS). <b>Value secured</b> counts the assets held on the L2: bridged from Ethereum, bridged via third-party bridges, and minted natively.'))
+      '<b>Activity</b> is L2BEAT’s user operations per second (UOPS). <b>Value secured</b> counts the assets held on the L2: bridged from Ethereum, bridged via third-party bridges, and minted natively. It leaves out the chain’s own token (such as ARB or OP), whose price would otherwise dominate for some chains.')}</details>`
     + sourceList([SRC.l2beatProject(s), s.da === 'blobs' ? SRC.blobscan : null, SRC.stages, SRC.eoL2],
-      `Activity and value secured are 7-day averages${ST.mode === 'live' ? '' : ' to Sep 27'}; blob counts cover ${D.blobLive ? 'the last ' + hoursLabel(D.l1.blobSourceDays) : 'the 24 hours to Sep 28'}. Colors nod to each network’s brand.`);
+      `Activity and value secured are 7-day averages${ST.mode === 'live' ? '' : ' to Sep 27'}; blobs a day are ${D.blobLive ? 'projected from the last ' + hoursLabel(D.l1.blobSourceDays) : 'counted over the 24 hours to Sep 28'}. Colors nod to each network’s brand.`)
+    + cardEnd();
 }
 
 /* ---------- Beacon Vault ---------- */
@@ -456,7 +499,7 @@ function vaultCard() {
   const s = D.staking, hist = s.hist, sp = D.supply;
   const issueShare = clamp(Math.floor((sp.issuedPerDay * 365) / s.staked / (s.apr / 100) * 100) / 100, 0, 1);
   const capped = s.entryQ / 20000 > 96 || s.exitQ / 20000 > 16;
-  const xn = s.exitNote;
+  const xn = s.exitNote && s.exitNote.expires && Date.now() < Date.parse(s.exitNote.expires) ? s.exitNote : null; // a dated fact-check, shown only while it is recent
   return head('Consensus layer · Staking', 'Beacon Vault', 'Proof of stake: validators lock ETH as collateral to propose and attest to blocks. They earn rewards for doing it honestly and can lose part of their stake (slashing) for provable misbehavior.', '#bcd0ff')
     + `<div class="stats">${stat('ETH staked', '≈' + compact(s.staked, 1), s.pct.toFixed(1) + '% of all ETH')}
       ${stat('Active validators', fmt(s.validators))}
@@ -474,7 +517,8 @@ function vaultCard() {
       `The protocol limits how fast ETH can join or leave staking: up to ${s.churn} ETH per 6.4-minute epoch in each direction, so surges wait in line. A long entry queue means more ETH wants to be staked than the protocol lets in at once.`,
       xn ? `<b>About the exit line:</b> on ${xn.date}, about ${Math.round(xn.consolidationShare * 100)}% of it was validators merging into bigger ones (consolidations, EIP-7251). That ETH stays staked; only about ${fmt(xn.unstakingEth)} ETH was actually leaving staking.` : '',
       `<b>The staking rate</b> comes from beaconcha.in’s ETH.STORE index. About ${Math.round(issueShare * 100)}% of it is newly issued ETH and the rest is priority fees; MEV payments aren’t counted, so all-in returns run slightly higher.`))
-    + sourceList([SRC.vq, SRC.ethstore, SRC.eoPos, SRC.eoStaking, SRC.eip7251], asOf() + '.');
+    + sourceList([SRC.vq, SRC.ethstore, SRC.eoPos, SRC.eoStaking, SRC.eip7251], asOf() + '.')
+    + cardEnd();
 }
 
 /* ---------- The Burn ---------- */
@@ -496,7 +540,8 @@ function burnCard() {
     + block('Why it matters', paras(
       'Supply grows when issuance outpaces the burn, and shrinks when busy blocks push base fees, and the burn, above it. Issuance rises with the amount of ETH staked.',
       'Blob fees are burned too, but at today’s blob prices they add almost nothing.'))
-    + sourceList([SRC.usm, SRC.eip1559, SRC.eoGas, SRC.eoIssuance], asOf() + '.');
+    + sourceList([SRC.usm, SRC.eip1559, SRC.eoGas, SRC.eoIssuance], asOf() + '.')
+    + cardEnd();
 }
 
 function renderCard() {
@@ -511,15 +556,51 @@ function renderCard() {
   card.innerHTML = html;
   card.scrollTop = 0;
   bindSparks();
-  card.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', () => {
+  card.querySelectorAll('[data-act]').forEach((b) => b.addEventListener('click', (e) => {
+    e.stopPropagation();
     if (b.dataset.act === 'tour') setTour(true);
-    else if (b.dataset.act === 'about') { $('#about').hidden = false; $('#aboutClose').focus(); }
+    else if (b.dataset.act === 'about') openAbout();
+    else if (b.dataset.act === 'next') { setTour(false); selectStop(ST.stop + 1); }
+    else if (b.dataset.act === 'share') shareStop(b);
   }));
   card.querySelectorAll('[data-go]').forEach((b) => b.addEventListener('click', () => {
     const i = STOPS.findIndex((x) => x.type === b.dataset.go); if (i >= 0) { setTour(false); selectStop(i); }
   }));
-  if (SMALL) card.classList.add('collapsed');
+  if (SMALL) {
+    card.classList.add('collapsed');
+    const hd = card.querySelector('.card-head');
+    if (hd) { hd.setAttribute('role', 'button'); hd.tabIndex = 0; hd.setAttribute('aria-expanded', 'false'); hd.setAttribute('aria-label', STOPS[ST.stop].name + ': show details'); }
+  }
   layoutMobile();
+}
+function toggleCard() {
+  const open = !card.classList.toggle('collapsed');
+  const hd = card.querySelector('.card-head');
+  if (hd) { hd.setAttribute('aria-expanded', String(open)); hd.setAttribute('aria-label', STOPS[ST.stop].name + (open ? ': hide details' : ': show details')); }
+}
+/* ---------- shareable links: every stop has its own address ---------- */
+const SITE_URL = 'https://ethereum-town.vercel.app/';
+function stopKey(s) { return s.type === 'overview' ? '' : s.type === 'l2' ? s.shop.key : s.type; }
+let HASH_KEEP = [];
+function syncHash() {
+  const h = HASH_KEEP.concat(stopKey(STOPS[ST.stop]) || []).join('-');
+  try { history.replaceState(null, '', h ? '#' + h : location.pathname + location.search); } catch (e) { /* sandboxed */ }
+}
+async function shareStop(btn) {
+  const s = STOPS[ST.stop], key = stopKey(s);
+  const url = SITE_URL + (key ? '#' + key : '');
+  const title = s.type === 'overview' ? 'Ethereum Town' : `${s.name} · Ethereum Town`;
+  if (navigator.share && matchMedia('(pointer: coarse)').matches) {
+    try { await navigator.share({ title, url }); return; } catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  let ok = false;
+  try { await navigator.clipboard.writeText(url); ok = true; } catch (e) {
+    try { const ta = document.createElement('textarea'); ta.value = url; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;opacity:0;left:0;top:0'; document.body.appendChild(ta); ta.select(); ok = document.execCommand('copy'); ta.remove(); } catch (e2) { ok = false; }
+  }
+  const old = btn.innerHTML;
+  btn.textContent = ok ? 'Link copied' : url;
+  if (!ok) btn.style.userSelect = 'text';
+  setTimeout(() => { if (btn.isConnected) { btn.innerHTML = old; btn.style.userSelect = ''; } }, ok ? 1800 : 6000);
 }
 
 /* =====================================================================
@@ -593,6 +674,8 @@ function selectStop(i, fromTour = false) {
     ring.position.set(cx, 0.08, cy); ring.scale.setScalar(r);
   }
   if (!fromTour) ST.tourT = 0;
+  syncHash();
+  if (s.type !== 'overview' && !ST.touched) { ST.touched = true; $('.plaque').classList.add('compact'); }
 }
 function setTour(on) {
   ST.tour = on; ST.tourT = 0; $('#tour').setAttribute('aria-pressed', String(on));
@@ -657,6 +740,9 @@ function setModeUI() {
   $('#goLive').hidden = live || !LIVE_OK;
   $('#asof').textContent = live ? `Live from Ethereum mainnet · rankings refreshed ${D.liveAsOf || 'recently'}` : `Data snapshot · ${D.asOfLabel} · trains replay ${D.replay.from}–${D.replay.to} UTC`;
 }
+let aboutReturn = null;
+function openAbout() { aboutReturn = document.activeElement; $('#about').hidden = false; $('#aboutClose').focus(); }
+function closeAbout() { $('#about').hidden = true; if (aboutReturn && aboutReturn.isConnected && aboutReturn.focus) aboutReturn.focus(); aboutReturn = null; }
 function bindUI() {
   $('#prev').addEventListener('click', () => { setTour(false); selectStop(ST.stop - 1); });
   $('#next').addEventListener('click', () => { setTour(false); selectStop(ST.stop + 1); });
@@ -666,15 +752,24 @@ function bindUI() {
   $('#tour').addEventListener('click', () => setTour(!ST.tour));
   $('#hideBtn').addEventListener('click', () => setUiHidden(true));
   $('#showUi').addEventListener('click', () => setUiHidden(false));
-  $('#aboutBtn').addEventListener('click', () => { $('#about').hidden = false; $('#aboutClose').focus(); });
-  $('#aboutClose').addEventListener('click', () => { $('#about').hidden = true; });
-  $('#about').addEventListener('click', (e) => { if (e.target.id === 'about') $('#about').hidden = true; });
+  $('#aboutBtn').addEventListener('click', openAbout);
+  $('#aboutClose').addEventListener('click', closeAbout);
+  $('#about').addEventListener('click', (e) => { if (e.target.id === 'about') closeAbout(); });
+  $('#about').addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const f = [...$('#about').querySelectorAll('button, a[href]')].filter((el) => el.offsetParent !== null);
+    if (!f.length) return;
+    if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+    else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+  });
   $('#keyToggle').addEventListener('click', () => { const k = $('#key'); const min = k.classList.toggle('min'); $('#keyToggle').textContent = min ? 'Show' : 'Hide'; $('#keyToggle').setAttribute('aria-expanded', String(!min)); });
   $('#goLive').addEventListener('click', () => { goLive(); });
-  card.addEventListener('click', (e) => { if (SMALL && e.target.closest('.card-head')) card.classList.toggle('collapsed'); });
+  card.addEventListener('click', (e) => { if (SMALL && e.target.closest('.card-head')) toggleCard(); });
+  card.addEventListener('keydown', (e) => { if (SMALL && (e.key === 'Enter' || e.key === ' ') && e.target.classList && e.target.classList.contains('card-head')) { e.preventDefault(); e.stopPropagation(); toggleCard(); } });
   window.addEventListener('keydown', (e) => {
     if (e.target.closest && e.target.closest('input,textarea')) return;
-    if (!$('#about').hidden && e.key === 'Escape') { $('#about').hidden = true; return; }
+    if (!$('#about').hidden) { if (e.key === 'Escape') closeAbout(); return; }
+    if ((e.key === ' ' || e.key === 'Enter') && e.target.closest && e.target.closest('button,a,summary,[role="button"]')) return; // let focused controls work
     if (e.key === 'ArrowRight') { setTour(false); selectStop(ST.stop + 1); }
     else if (e.key === 'ArrowLeft') { setTour(false); selectStop(ST.stop - 1); }
     else if (e.key === ' ') { e.preventDefault(); setPaused(!ST.paused); }
@@ -682,7 +777,7 @@ function bindUI() {
     else if (e.key === 'n' || e.key === 'N') cycleSky();
     else if (e.key === 't' || e.key === 'T') setTour(!ST.tour);
     else if (e.key === 'h' || e.key === 'H') setUiHidden(!ST.uiHidden);
-    else if (e.key === '?') $('#about').hidden = false;
+    else if (e.key === '?') openAbout();
     else if (e.key === 'Escape') { if (ST.tour) setTour(false); }
   });
 }
@@ -712,25 +807,42 @@ function applyTown(j) {
   if (j.price) D.price = j.price;
   if (j.names) Object.assign(D.names, j.names);
   ST.supply0 = D.supply.supply; ST.issuePerSlot = D.supply.issuedPerDay / 7200;
-  D.liveAsOf = new Date(j.asOf || Date.now()).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  // shops already built keep their lot and height; their cards pick up the new numbers
+  for (const shop of SHOPS) {
+    const n = D.l2.find((x) => x.key === shop.key); if (!n) continue;
+    for (const f of ['uops', 'wow', 'tvs', 'tvsTotal', 'ownToken', 'tvs7d', 'stage', 'category', 'stack', 'da', 'daLabel', 'blobsPerDay', 'blobShare', 'txPerDay', 'spark', 'sparkRange']) if (n[f] !== undefined) shop[f] = n[f];
+  }
+  D.liveAsOf = new Date(j.asOf || Date.now()).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 }
 function pulseToBlocks(j) {
-  return (j.blocks || []).map((b) => ({ n: b.n, ts: b.ts, tx: b.tx, gasPct: b.gasPct, baseFee: b.baseFee, blobs: b.blobs, posters: b.posters || [], slot: Math.floor((b.ts - GENESIS) / 12), burn: b.burn ?? (b.gasPct / 100) * GAS_LIMIT * b.baseFee * 1e-9 })).sort((a, b) => a.n - b.n);
+  return (j.blocks || []).map((b) => ({ n: b.n, ts: b.ts, tx: b.tx, gasPct: b.gasPct, baseFee: b.baseFee, blobs: b.blobs, posters: b.posters || [], slot: Math.floor((b.ts - GENESIS) / 12), burn: b.burn ?? (b.gasPct / 100) * GAS_LIMIT * b.baseFee * 1e-9, builder: b.builder || null, live: true })).sort((a, b) => a.n - b.n);
 }
+function notePulse(j) { if (j.finalized) D.finalized = j.finalized; if (j.tipGwei != null) D.tipGwei = j.tipGwei; }
 function queueLive(blocks) {
   const kNow = Math.floor(ST.T / 12);
   for (const b of blocks) {
     if (b.n <= ST.lastLiveN) continue;
-    let k = ST.lastK === null ? kNow + 2 : Math.max(ST.lastK + 1, kNow + 2);
+    // the first live block takes over the next train (still out of town, containers not yet loaded);
+    // later blocks queue behind it, on slots whose trains haven't started their approach
+    const into = ST.T - 12 * kNow;
+    const k = ST.lastK === null ? kNow + 1 : Math.max(ST.lastK + 1, into < 8 ? kNow + 1 : kNow + 2);
     if (ST.lastK !== null && ST.lastK - kNow > 5) continue;
+    retireSlot(k, b.n);
     LIVE.set(k, b); ST.lastK = k; ST.lastLiveN = b.n;
     if (ST.liveK0 === null) ST.liveK0 = k;
   }
+}
+function showLatest(blocks) { // the board shows the newest real block straight away; its train is the first to arrive
+  const last = blocks[blocks.length - 1];
+  ST.lastLiveN = Math.max(0, last.n - 1); ST.lastEpoch = null;
+  queueLive(blocks);
+  boardBlock = last; updateBoard(last);
 }
 async function pollPulse() {
   if (document.hidden) return;
   const j = await getJSON('/api/pulse', 5000);
   if (!j || !j.blocks) return;
+  notePulse(j);
   if (ST.mode === 'live') queueLive(pulseToBlocks(j));
   else ST.pendingLive = pulseToBlocks(j);
 }
@@ -738,18 +850,20 @@ function goLive() {
   if (!LIVE_OK) return;
   ST.mode = 'live'; ST.speed = 1; ST.liveK0 = null; ST.lastK = null; LIVE.clear();
   document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(+b.dataset.speed === 1)));
-  if (ST.pendingLive) { ST.lastLiveN = Math.max(0, ST.pendingLive[ST.pendingLive.length - 1].n - 2); queueLive(ST.pendingLive); }
+  if (ST.pendingLive && ST.pendingLive.length) showLatest(ST.pendingLive);
   setModeUI(); renderCard();
 }
 async function startLive() {
   const j = await getJSON('/api/pulse', 5000);
   if (!j || !j.blocks || !j.blocks.length) { setModeUI(); return; }
   LIVE_OK = true;
+  notePulse(j);
   const blocks = pulseToBlocks(j);
   ST.mode = 'live';
-  ST.lastLiveN = Math.max(0, blocks[blocks.length - 1].n - 2);
-  queueLive(blocks);
+  showLatest(blocks);
   setModeUI(); renderCard();
   setInterval(pollPulse, 6000);
-  setInterval(async () => { const t = await getJSON('/api/town', 8000); if (t) { applyTown(t); setVaultQueueTargets(D.staking.entryQ, D.staking.exitQ); renderCard(); } }, 15 * 60 * 1000);
+  const refreshTown = async () => { const t = await getJSON('/api/town', 12000); if (t && t.ok) { applyTown(t); setVaultQueueTargets(D.staking.entryQ, D.staking.exitQ); setModeUI(); renderCard(); } };
+  if (!D.liveAsOf) setTimeout(refreshTown, 15000); // the first request timed out: try again soon rather than in 15 minutes
+  setInterval(refreshTown, 15 * 60 * 1000);
 }

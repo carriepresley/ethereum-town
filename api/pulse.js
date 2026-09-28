@@ -33,6 +33,14 @@ async function rpc(body) {
 }
 const hex = (n) => '0x' + n.toString(16);
 const num = (h) => (h ? parseInt(h, 16) : 0);
+// most blocks carry their builder's name in extraData (e.g. "Titan (titanbuilder.xyz)")
+function builderOf(extra) {
+  if (!extra || extra.length < 4) return null;
+  let s = '';
+  for (let i = 2; i + 1 < extra.length; i += 2) { const c = parseInt(extra.slice(i, i + 2), 16); if (c >= 32 && c < 127) s += String.fromCharCode(c); }
+  s = s.trim();
+  return (s.match(/[A-Za-z]/g) || []).length >= 3 ? s.slice(0, 40) : null;
+}
 function keyFor(rollup, from) {
   if (rollup) return BLOBSCAN_KEYS[rollup] || rollup;
   return SENDERS[(from || '').toLowerCase()] || 'other';
@@ -42,8 +50,13 @@ module.exports = async (req, res) => {
   try {
     const head = num((await rpc({ jsonrpc: '2.0', id: 1, method: 'eth_blockNumber', params: [] })).result);
     const nums = [head - 3, head - 2, head - 1, head];
-    const batch = await rpc(nums.map((n) => ({ jsonrpc: '2.0', id: n, method: 'eth_getBlockByNumber', params: [hex(n), false] })));
-    const blocks = batch.map((r) => r.result).filter(Boolean).sort((a, b) => num(a.number) - num(b.number));
+    const batch = await rpc(nums.map((n) => ({ jsonrpc: '2.0', id: n, method: 'eth_getBlockByNumber', params: [hex(n), false] }))
+      .concat([{ jsonrpc: '2.0', id: 'fin', method: 'eth_getBlockByNumber', params: ['finalized', false] }, { jsonrpc: '2.0', id: 'fee', method: 'eth_feeHistory', params: ['0x5', 'latest', [50]] }]));
+    const byId = Object.fromEntries(batch.map((r) => [String(r.id), r.result]));
+    const blocks = nums.map((n) => byId[String(n)]).filter(Boolean).sort((a, b) => num(a.number) - num(b.number));
+    const fin = byId.fin ? { n: num(byId.fin.number), ts: num(byId.fin.timestamp) } : null;
+    const tips = ((byId.fee && byId.fee.reward) || []).map((r) => num(r && r[0]) / 1e9).filter((x) => isFinite(x));
+    const tipGwei = tips.length ? +(tips.reduce((s, x) => s + x, 0) / tips.length).toFixed(4) : null;
 
     // blob posters: Blobscan's recent transactions carry rollup labels
     const posters = new Map(); // block number -> Map(key -> blobs)
@@ -85,12 +98,12 @@ module.exports = async (req, res) => {
       if (counted < blobs) list.push(['other', blobs - counted]);
       return {
         n, ts: num(b.timestamp), tx: (b.transactions || []).length, gasPct: +(gu / gl * 100).toFixed(1), gasLimit: gl,
-        baseFee: +(bf / 1e9).toFixed(4), blobs, posters: list, burn: +(gu * bf / 1e18).toFixed(6),
+        baseFee: +(bf / 1e9).toFixed(4), blobs, posters: list, burn: +(gu * bf / 1e18).toFixed(6), builder: builderOf(b.extraData),
       };
     });
     res.setHeader('Cache-Control', 'public, s-maxage=8, stale-while-revalidate=30');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(200).json({ ok: true, head, indexedTo, blocks: out, t: Date.now() });
+    res.status(200).json({ ok: true, head, indexedTo, blocks: out, finalized: fin, tipGwei, t: Date.now() });
   } catch (e) {
     res.setHeader('Cache-Control', 'no-store');
     res.status(502).json({ ok: false, error: String(e && e.message || e) });

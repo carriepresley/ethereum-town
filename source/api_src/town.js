@@ -53,7 +53,11 @@ module.exports = async (req, res) => {
       return {
         key: id, slug, name: NAMES[id] || p.name.replace(/ Chain$/, id === 'robinhood' ? ' Chain' : ''),
         uops: +u7.toFixed(1), wow: up ? +(u7 / up - 1).toFixed(4) : 0,
-        tvs: Math.round((p.tvs && p.tvs.breakdown && p.tvs.breakdown.total) || 0), tvs7d: +((p.tvs && p.tvs.change7d) || 0).toFixed(4),
+        // value secured without the chain's own token (L2BEAT 'associated'); keep the total for the card
+        tvs: Math.round(((p.tvs && p.tvs.breakdown && p.tvs.breakdown.total) || 0) - ((p.tvs && p.tvs.breakdown && p.tvs.breakdown.associated) || 0)),
+        tvsTotal: Math.round((p.tvs && p.tvs.breakdown && p.tvs.breakdown.total) || 0),
+        ownToken: ((p.tvs && p.tvs.associatedTokens) || []).slice(0, 2).map((t) => t.symbol).join('/'),
+        tvs7d: +((p.tvs && p.tvs.change7d) || 0).toFixed(4),
         stage: p.stage, category: p.category, stack: (p.providers || []).join(', ') || 'Independent',
         da: da.includes('EthereumBlobs') ? 'blobs' : (da.some((d) => d.includes('EigenDA')) ? 'eigenda' : 'own'), daLabel: risks['Data Availability'] || '',
         txPerDay: Math.round(avg(rows.slice(-7).map((r) => r[1]))),

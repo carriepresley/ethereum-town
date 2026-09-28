@@ -11,9 +11,9 @@ function mkBlock(b) { // replay tuple -> block
 const REPLAY = D.replay.blocks.map(mkBlock);
 const AVG_BURN = REPLAY.reduce((s, b) => s + b.burn, 0) / REPLAY.length;
 const ST = {
-  mode: 'replay', T: -2.6, speed: 1, paused: RM, sky: 'now', hourSet: 13, stop: 0, tour: false, tourT: 0,
+  mode: 'replay', T: -2.6, speed: 1, paused: false, sky: 'now', hourSet: 13, stop: 0, tour: false, tourT: 0,
   cumBurn: 0, supply0: D.supply.supply, issuePerSlot: D.supply.issuedPerDay / 7200, liveK0: null, lastLiveN: 0, lastK: null,
-  started: performance.now(), nightF: 0, burnLevel: 0.4,
+  started: performance.now(), nightF: 0, burnLevel: 0.4, lastEpoch: null, touched: false, lowered: false,
 };
 const LIVE = new Map(); // slot k -> block
 function blockFor(k) {
@@ -46,7 +46,7 @@ function planBlock(k, b) {
 function scheduleTrucks(k, b, T) {
   const plan = planBlock(k, b); const byKey = SHOP_BY_KEY();
   for (const tr of plan.trucks) {
-    const id = k + ':' + tr.j; if (DONE.trucks.has(id)) continue;
+    const id = k + ':' + b.n + ':' + tr.j; if (DONE.trucks.has(id)) continue;
     const shop = byKey[tr.key] || null;
     const { pts, holdSeg } = truckPath(shop, tr.spotX);
     const Lh = pathLen(pts, holdSeg), travel = Lh / 3.0 * 1.2 + 1.6;
@@ -56,6 +56,7 @@ function scheduleTrucks(k, b, T) {
     DONE.trucks.add(id);
     const v = spawnVehicle('truck', pts, { color: containerColor(tr.key), key: tr.key, holds: [{ seg: holdSeg, until: 12 * k + tr.release }], v0: 2.6 });
     if (!v) continue;
+    v.slotK = k; v.blockN = b.n;
     tr.v = v;
     let adv = (T - tSpawn) * 3.0;
     if (adv > 0.2) { // catch up when joining late
@@ -65,6 +66,11 @@ function scheduleTrucks(k, b, T) {
     }
     if (shop) v.onDone = (vv) => { vv.st = 0; };
   }
+}
+function retireSlot(k, n) {
+  for (const v of vehicles) if (v.slotK === k && v.blockN !== n) { v.st = 0; v.holds = []; }
+  for (let i = crates.length - 1; i >= 0; i--) if (crates[i].k === k) { crateMesh.setMatrixAt(crates[i].i, ZERO_M); cFree.push(crates[i].i); crates.splice(i, 1); }
+  crateMesh.instanceMatrix.needsUpdate = true;
 }
 function fireCrates(k, b, T, train) {
   const plan = planBlock(k, b);
@@ -146,7 +152,8 @@ function simTick(dt, T) {
   for (const tr of TRAINS) if (!active.some((a) => a.k === tr.k)) { tr.k = null; tr.g.visible = false; }
   for (const a of active) {
     let tr = TRAINS.find((x) => x.k === a.k);
-    if (!tr) { tr = TRAINS.find((x) => x.k === null); if (!tr) continue; tr.k = a.k; tr.block = a.b; tr.loaded = new Array(21).fill(false); tr.nb = Math.min(21, a.b.blobs); if (a.t > 8.5) tr.loaded.fill(true); }
+    if (!tr) { tr = TRAINS.find((x) => x.k === null); if (!tr) continue; tr.k = a.k; tr.block = null; }
+    if (tr.block !== a.b) { tr.block = a.b; tr.loaded = new Array(21).fill(false); tr.nb = Math.min(21, a.b.blobs); if (a.t > 8.5) tr.loaded.fill(true); }
     const front = trainFront(a.t);
     tr.g.position.set(front, 0.12, RAIL_Y); tr.g.visible = front > 3.4 && front - trainLength(tr.nb) < 48.6;
     tr.front = front; tr.t = a.t;
@@ -181,20 +188,23 @@ function simTick(dt, T) {
   }
   updateCrates(T);
   const cur = blockFor(kNow) || blockFor(kNow - 1);
-  if (cur && cur !== boardBlock && T - 12 * kNow > -3) { boardBlock = cur; updateBoard(cur); }
+  if (cur && cur !== boardBlock && T - 12 * kNow > -3 && (ST.mode !== 'live' || cur.live)) { boardBlock = cur; updateBoard(cur); }
   // tidy memory
   if (DONE.depart.size > 400) for (const s of Object.values(DONE)) { for (const v of s) { const kk = typeof v === 'number' ? v : parseInt(v); if (kk < kNow - 5) s.delete(v); } }
 }
 function onDepart(k, b) {
+  for (let i = 0; i < 14; i++) smoke.emit(42.2 + R(-0.2, 0.2), 6.7, 22 + R(-0.2, 0.2), R(-0.1, 0.25), R(0.9, 1.5), R(-0.15, 0.15), R(5, 8), 0.5, 2.4, 0.45, '#8f8b86', '#b8b5b0', 0.25);
+  if (ST.mode === 'live' && !b.live) return; // a replay train still finishing its run after going live: no numbers
   ST.cumBurn += b.burn;
   ST.burnLevel = clamp(ST.burnLevel + b.burn / Math.max(1e-4, AVG_BURN) * 0.45, 0, 3.5);
-  for (let i = 0; i < 14; i++) smoke.emit(42.2 + R(-0.2, 0.2), 6.7, 22 + R(-0.2, 0.2), R(-0.1, 0.25), R(0.9, 1.5), R(-0.15, 0.15), R(5, 8), 0.5, 2.4, 0.45, '#8f8b86', '#b8b5b0', 0.25);
   toast([37.5, 2.6, RAIL_Y], `Block ${fmt(b.n)} departs · ${fmt(b.tx)} txns`, 'blk');
   if (b.burn > 0) toast([42.0, 7.4, 21.6], `−${b.burn < 0.01 ? b.burn.toFixed(4) : b.burn.toFixed(3)} ETH burned`, 'burn');
-  if (b.slot % 32 === 0) epochPayout(b);
+  const ep = Math.floor(b.slot / 32);
+  if (ST.lastEpoch !== null && ep !== ST.lastEpoch) epochPayout(ep); // first block of a new epoch (also when its first slot was missed)
+  ST.lastEpoch = ep;
 }
-function epochPayout(b) {
-  toast([44, 5.4, 14], `Epoch ${fmt(Math.floor(b.slot / 32))} · staking rewards credited`, 'gold');
+function epochPayout(ep) {
+  toast([44, 5.4, 14], `Epoch ${fmt(ep)} · staking rewards credited`, 'gold');
   for (let i = 0; i < 26; i++) sendReward(-R(0, 0.45)); // a burst at the epoch boundary
 }
 /* ---------- staking rewards: gold sparks leave the vault for the stakers ----------

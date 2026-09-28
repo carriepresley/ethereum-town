@@ -77,7 +77,9 @@ for k,name,color in SHOPS:
     spark=[round(x[2]/86400,2) for x in r[-30:]]
     d0=datetime.datetime.utcfromtimestamp(r[-30][0]).strftime("%b %-d"); d1=datetime.datetime.utcfromtimestamp(r[-1][0]).strftime("%b %-d")
     shops.append({"key":k,"slug":p["slug"],"name":name,"color":color,"uops":round(u7,1),"wow":round(u7/up-1,4) if up else 0,
-      "tvs":round(p["tvs"]["breakdown"]["total"]), "tvs7d":round(p["tvs"].get("change7d") or 0,4),
+      # value secured without the chain's own token ("associated" on L2BEAT); the total is kept for the card
+      "tvs":round(p["tvs"]["breakdown"]["total"]-(p["tvs"]["breakdown"].get("associated") or 0)),"tvsTotal":round(p["tvs"]["breakdown"]["total"]),
+      "ownToken":"/".join(t["symbol"] for t in (p["tvs"].get("associatedTokens") or [])[:2]),"tvs7d":round(p["tvs"].get("change7d") or 0,4),
       "stage":p["stage"],"category":p["category"],"stack":", ".join(p.get("providers") or []) or "Independent",
       "da":damode,"daLabel":risks.get("Data Availability",""),"blobsPerDay":round(per.get(dict(worldchain="worldchain").get(k,k),0)/days),
       "blobShare":round(per.get(k,0)/tot,4),"txPerDay":round(sum(x[1] for x in r[-7:])/7),"spark":spark,"sparkRange":[d0,d1]})
@@ -111,7 +113,7 @@ DATA={
  "staking":{"staked":last["staked_amount"],"pct":last["staked_percent"],"validators":last["validators"],"apr":last["apr"],
             "entryQ":last["entry_queue"],"entryWait":last["entry_wait"],"exitQ":last["exit_queue"],"exitWait":last["exit_wait"],"churn":256,"sweepDays":7.7,"hist":hist,
             # fact-check on Sep 28: ~99% of the exit line was EIP-7251 consolidations (ETH stays staked); ~1.9K ETH was really leaving
-            "exitNote":{"date":"Sep 28, 2026","consolidationShare":0.99,"unstakingEth":1900}},
+            "exitNote":{"date":"Sep 28, 2026","expires":"2026-09-30T12:00:00Z","consolidationShare":0.99,"unstakingEth":1900}},
  "l2":shops,"l2agg":l2agg,
  "stables":{"eth":148.4e9,"all":313.1e9,"share":0.474,"ethYoY":-0.063,"allYoY":0.057},
 }

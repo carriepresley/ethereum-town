@@ -13,6 +13,8 @@ const D = window.ETH_TOWN_DATA;
 const $ = (s) => document.querySelector(s);
 const RM = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const SMALL = window.matchMedia('(max-width: 760px)').matches;
+// phones and weaker machines get fewer pixels, smaller shadows and no multisampling
+const LOW = SMALL || (navigator.deviceMemory || 8) <= 4 || (navigator.hardwareConcurrency || 8) <= 4;
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const lerp = (a, b, t) => a + (b - a) * t;
 const smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
@@ -27,8 +29,9 @@ function hash01(n) { n = Math.imul(n ^ 0x9e3779b9, 0x85ebca6b); n ^= n >>> 13; n
 
 /* ---------------- renderer, scene, camera ---------------- */
 const canvas = $('#town');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: false });
-const PR = Math.min(window.devicePixelRatio || 1, SMALL ? 1.6 : 2);
+// the scene renders through the composer, so antialiasing comes from its multisampled target, not the canvas
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+const PR = Math.min(window.devicePixelRatio || 1, LOW ? 1.35 : 2);
 renderer.setPixelRatio(PR);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -54,7 +57,19 @@ controls.panSpeed = 0.9;
 controls.rotateSpeed = 0.6;
 controls.target.set(26.5, 0, 17);
 
-const composer = new EffectComposer(renderer);
+// multisampling for standard-density screens (high-density ones hide jagged edges on their own), only where the GPU supports it
+function msaaSamples() {
+  if (LOW || PR >= 1.5) return 0;
+  try {
+    if (!renderer.extensions.has('EXT_color_buffer_float')) return 0;
+    const gl = renderer.getContext(), ok = gl.getInternalformatParameter(gl.RENDERBUFFER, gl.RGBA16F, gl.SAMPLES);
+    const max = ok && ok.length ? Math.max(...ok) : 0;
+    const big = window.innerWidth * window.innerHeight * PR * PR > 2.4e6;
+    return max >= 4 && !big ? 4 : max >= 2 ? 2 : 0;
+  } catch (e) { return 0; }
+}
+const MSAA = msaaSamples();
+const composer = new EffectComposer(renderer, MSAA ? new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: MSAA }) : undefined);
 composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.25, 0.38, 0.88);
 composer.addPass(bloom);
@@ -65,7 +80,7 @@ const hemi = new THREE.HemisphereLight(0xdfeeff, 0x8a7a62, 1.0);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff2de, 2.6);
 sun.castShadow = true;
-const SHADOW = SMALL ? 1536 : 3072;
+const SHADOW = LOW ? 1024 : 3072;
 sun.shadow.mapSize.set(SHADOW, SHADOW);
 Object.assign(sun.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, near: 1, far: 220 });
 sun.shadow.bias = -0.0003;

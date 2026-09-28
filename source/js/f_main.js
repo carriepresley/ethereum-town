@@ -40,9 +40,28 @@ function buildWorld() {
 
 let lastFrame = performance.now(), flagT = 0, screenT = 0;
 const NORENDER = /norender/.test(location.hash);
-window.__town = { ST, people, vehicles, TRAINS, crates, LIVE, SHOPS, VAULTQ, REWARDS, flyTo: (v) => { flyTo(v, true); updateFly(0.1); } };
+window.__town = { ST, D, people, vehicles, TRAINS, crates, LIVE, SHOPS, VAULTQ, REWARDS, LOW, MSAA, get board() { return boardBlock; }, get pr() { return renderer.getPixelRatio(); }, flyTo: (v) => { flyTo(v, true); updateFly(0.1); } };
+/* one-step quality drop when the first seconds run slowly: fewer pixels, no MSAA, no shadows from people and cars */
+const PERF = { t: 0, n: 0, sum: 0, done: false };
+function watchPerf(raw) {
+  if (PERF.done || NORENDER || document.hidden || raw > 0.5) return;
+  PERF.t += raw; if (PERF.t < 2) return; // skip warm-up (shader compiles, first data)
+  PERF.n++; PERF.sum += raw;
+  if (PERF.t > 7) { PERF.done = true; if (PERF.sum / PERF.n > 1 / 24) lowerQuality(); }
+}
+function lowerQuality() {
+  if (ST.lowered) return; ST.lowered = true;
+  const pr = Math.max(1, renderer.getPixelRatio() * 0.75);
+  renderer.setPixelRatio(pr); composer.setPixelRatio(pr);
+  for (const rt of [composer.renderTarget1, composer.renderTarget2]) if (rt.samples) { rt.samples = 0; rt.dispose(); }
+  for (const m of ACTOR_MESHES) m.castShadow = false;
+  if (sun.shadow.mapSize.x > 1024) { sun.shadow.mapSize.set(1024, 1024); if (sun.shadow.map) { sun.shadow.map.dispose(); sun.shadow.map = null; } }
+  resize();
+}
 function frame(now) {
-  const dtR = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+  const raw = (now - lastFrame) / 1000; lastFrame = now;
+  const dtR = Math.min(ST.mode === 'live' ? 0.5 : 0.1, raw); // live: keep pace with the chain even on slow devices
+  watchPerf(raw);
   const dt = ST.paused ? 0 : dtR * (ST.mode === 'live' ? 1 : ST.speed);
   ST.T += dt;
   applySky(dtR);
@@ -103,11 +122,20 @@ function resize() {
   const dx = (!ST.uiHidden && w > 1100) ? 178 : 0, dy = (!ST.uiHidden && w > 760) ? 18 : 0;
   if (dx || dy) camera.setViewOffset(w + 2 * dx, h + 2 * dy, 2 * dx, 0, w, h); else camera.clearViewOffset();
   camera.updateProjectionMatrix();
-  const sc = (h * PR) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
+  const sc = (h * renderer.getPixelRatio()) / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)));
   smoke.mat.uniforms.uScale.value = sc; flames.mat.uniforms.uScale.value = sc; sparkles.mat.uniforms.uScale.value = sc;
 }
 window.addEventListener('resize', resize);
 
+function applyHash(tokens, instant) {
+  for (const t of tokens) {
+    if (SKY_HOUR[t] !== undefined || t === 'cycle') { ST.sky = t; $('#skyLabel').textContent = SKY_LABEL[t]; $('#sky').setAttribute('aria-label', 'Time of day: ' + SKY_LABEL[t]); if (t !== 'cycle' && instant) hourShown = SKY_HOUR[t]; else if (t === 'cycle') ST.hourSet = hourShown ?? 12; }
+    else if (t === 'tour') setTour(true);
+    else if (t === 'noui') setUiHidden(true);
+    else { const i = STOPS.findIndex((s) => (s.shop && s.shop.key === t) || s.type === t); if (i >= 0) { if (!tokens.includes('tour')) setTour(false); selectStop(i); if (instant) { flyTo(STOPS[i].view, true); updateFly(0.1); } } }
+  }
+  if (!instant && !tokens.length) { setTour(false); selectStop(0); } // address cleared: back to the overview
+}
 async function init() {
   resize();
   const fontsReady = Promise.race([Promise.all([
@@ -124,18 +152,20 @@ async function init() {
   buildVaultQueues(D.staking.entryQ, D.staking.exitQ);
   for (let i = 0; i < 26; i++) stroller(true);
   for (const cr of CAR_ROUTES) { const n = Math.round(cr.r * 12); for (let i = 0; i < n; i++) { const v = spawnVehicle('car', cr.pts.map((p) => [p[0], p[1]]), { instant: true, v0: 3 }); if (v) { let adv = R(2, pathLen(cr.pts) - 2); while (adv > 0 && v.seg < v.pts.length - 1) { const a = v.pts[v.seg + 1], d = Math.hypot(a[0] - v.x, a[1] - v.y); if (adv >= d) { v.x = a[0]; v.y = a[1]; v.seg++; adv -= d; } else { v.x += (a[0] - v.x) / d * adv; v.y += (a[1] - v.y) / d * adv; adv = 0; } } const a = v.pts[v.seg + 1]; if (a) v.hd = Math.atan2(a[1] - v.y, a[0] - v.x); } } }
+  // shareable views: #night, #dusk, #dawn, #day, #tour, #noui, or an L2 / place key (e.g. #base, #station, #vault, #burn)
+  const tokens = (location.hash || '').replace('#', '').toLowerCase().split(/[-.~_]/).filter(Boolean);
+  HASH_KEEP = tokens.filter((t) => SKY_HOUR[t] !== undefined || t === 'cycle' || t === 'noui'); // kept in the address as stops change
   bindUI();
   setPaused(ST.paused);
   selectStop(0);
   flyTo(STOPS[0].view, true); updateFly(0.1);
-  // shareable views: #night, #dusk, #dawn, #day, #tour, #noui, or an L2 / place key (e.g. #base, #station, #vault, #burn)
-  const tokens = (location.hash || '').replace('#', '').toLowerCase().split(/[-.~_]/).filter(Boolean);
-  for (const t of tokens) {
-    if (SKY_HOUR[t] !== undefined || t === 'cycle') { ST.sky = t; $('#skyLabel').textContent = SKY_LABEL[t]; if (t !== 'cycle') hourShown = SKY_HOUR[t]; }
-    else if (t === 'tour') setTour(true);
-    else if (t === 'noui') setUiHidden(true);
-    else { const i = STOPS.findIndex((s) => (s.shop && s.shop.key === t) || s.type === t); if (i >= 0) { selectStop(i); flyTo(STOPS[i].view, true); updateFly(0.1); } }
-  }
+  applyHash(tokens, true);
+  // a link pasted into the address bar of an open town (our own replaceState calls don't fire this)
+  window.addEventListener('hashchange', () => {
+    const t = (location.hash || '').replace('#', '').toLowerCase().split(/[-.~_]/).filter(Boolean);
+    HASH_KEEP = t.filter((x) => SKY_HOUR[x] !== undefined || x === 'cycle' || x === 'noui');
+    applyHash(t, false);
+  });
   applySky(0.016);
   setModeUI();
   document.body.classList.add('ready');
